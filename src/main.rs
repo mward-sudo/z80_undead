@@ -1,3 +1,9 @@
+mod cpu;
+
+use cpu::Cpu;
+
 fn main() {
-    println!("Hello, world!");
+    let mut cpu = Cpu::new();
+    println!("Z80 Emulator initialized");
+    // Add more functionality here as we develop the emulator
 }

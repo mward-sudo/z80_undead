@@ -4,6 +4,18 @@
 
 This project aims to create an accurate and flexible emulator for the Zilog Z80 processor. The Z80 was a popular 8-bit microprocessor used in many classic computers and gaming systems. This emulator serves as both a learning tool and a foundation for future retro-computing projects.
 
+## Current Version
+
+**Alpha v0.0.1**
+
+## Changelog
+
+### Alpha v0.0.1 (2023-04-XX)
+- Initial project setup
+- Basic project structure established
+- README created with project goals and planned features
+- License file added (MIT License)
+
 ## Goals
 
 1. **Accurate Z80 Core Emulation**
@@ -52,6 +64,15 @@ This project aims to create an accurate and flexible emulator for the Zilog Z80 
 ## Contributing
 
 This project is currently in its early stages. Contributions, suggestions, and feedback are welcome! Please feel free to open issues or submit pull requests.
+
+## Version Control
+
+This project uses semantic versioning. The version number format is MAJOR.MINOR.PATCH.
+- Alpha releases are denoted by the PATCH version number.
+- The latest stable release can be found on the `main` branch.
+- Development work is done on feature branches and merged into `develop`.
+
+To access a specific version, you can use git tags. For example:
 
 ## License
 
