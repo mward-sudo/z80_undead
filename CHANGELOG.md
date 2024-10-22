@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2024-03-XX
+
+### Added
+- Implemented Z80 CPU core architecture
+- Added CPU instruction modules:
+  - Core instruction set implementation
+  - Extended (ED prefix) instructions
+  - Control flow instructions
+  - Miscellaneous instructions
+  - Undocumented instructions support
+- Interrupt handling system implementation
+- CPU core testing framework
+- Memory management system
+- Register management system
+- Flag handling implementation
+
+### Changed
+- Restructured project to use modular architecture
+- Improved code organization with separate modules for different instruction types
+
+### Deprecated
+- N/A
+
+### Removed
+- Placeholder files from initial setup
+
+### Fixed
+- N/A
+
+### Security
+- N/A
+
 ## [0.0.1] - 2023-04-XX
 
 ### Added
@@ -37,5 +69,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 - N/A
 
-[Unreleased]: https://github.com/yourusername/z80-emulator/compare/v0.0.1...HEAD
+[Unreleased]: https://github.com/yourusername/z80-emulator/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/yourusername/z80-emulator/compare/v0.0.1...v0.1.0
 [0.0.1]: https://github.com/yourusername/z80-emulator/releases/tag/v0.0.1
