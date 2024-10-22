@@ -95,6 +95,54 @@ impl Cpu {
     fn get_flag(&self, flag: u8) -> bool {
         (self.f & flag) != 0
     }
+
+    /// Performs the ADD A, r operation
+    ///
+    /// This function implements the ADD instruction for the Z80 CPU.
+    /// It adds the value to the accumulator (A register) and updates the flags accordingly.
+    ///
+    /// Flags affected:
+    /// - S is set if result is negative; otherwise, it is reset.
+    /// - Z is set if result is 0; otherwise, it is reset.
+    /// - H is set if carry from bit 3; otherwise, it is reset.
+    /// - P/V is set if overflow; otherwise, it is reset.
+    /// - N is reset.
+    /// - C is set if carry from bit 7; otherwise, it is reset.
+    pub fn add_a(&mut self, value: u8) {
+        let a = self.a;
+        let result = a.wrapping_add(value);
+
+        self.set_flag(FLAG_S, result & 0x80 != 0);
+        self.set_flag(FLAG_Z, result == 0);
+        self.set_flag(FLAG_H, (a & 0x0F) + (value & 0x0F) > 0x0F);
+        self.set_flag(FLAG_PV, (a ^ value ^ 0x80) & (value ^ result) & 0x80 != 0);
+        self.set_flag(FLAG_N, false);
+        self.set_flag(FLAG_C, (a as u16) + (value as u16) > 0xFF);
+
+        self.a = result;
+    }
+
+    /// ADD A, r
+    pub fn add_a_r(&mut self, r: u8) {
+        self.add_a(r);
+    }
+
+    /// ADD A, n
+    pub fn add_a_n(&mut self, n: u8) {
+        self.add_a(n);
+    }
+
+    /// ADD A, (HL)
+    pub fn add_a_hl(&mut self) {
+        let address = self.get_hl();
+        let value = self.read_byte(address);
+        self.add_a(value);
+    }
+
+    // Helper method to get the value of HL register pair
+    fn get_hl(&self) -> u16 {
+        ((self.h as u16) << 8) | (self.l as u16)
+    }
 }
 
 // Flag bit positions
