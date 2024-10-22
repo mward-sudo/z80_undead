@@ -6,6 +6,7 @@ pub struct Cpu {
     pub d: u8,
     pub e: u8,
     pub h: u8,
+    pub i: u8,
     pub l: u8,
     pub f: u8, // Flag register
 
@@ -14,6 +15,7 @@ pub struct Cpu {
     pub sp: u16, // Stack Pointer
     pub ix: u16,
     pub iy: u16,
+    pub di: u16,
 
     // Alternate registers
     pub a_alt: u8,
@@ -36,6 +38,8 @@ pub struct Cpu {
     pub memory: Vec<u8>,
 
     pub halted: bool,
+
+    pub interrupt_mode: u8,
 }
 
 impl Cpu {
@@ -47,10 +51,12 @@ impl Cpu {
             d: 0,
             e: 0,
             h: 0,
+            i: 0,
             l: 0,
             f: 0,
             pc: 0,
             sp: 0,
+            di: 0,
             ix: 0,
             iy: 0,
             a_alt: 0,
@@ -66,6 +72,7 @@ impl Cpu {
             im: 0,
             memory: vec![0; 65536], // Initialize 64KB of memory
             halted: false,
+            interrupt_mode: 0,
         }
     }
 

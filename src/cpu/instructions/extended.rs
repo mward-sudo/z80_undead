@@ -170,6 +170,125 @@ impl Cpu {
         self.set_flag(FLAG_N, true);
         self.set_flag(FLAG_C, (a as u32) < (b as u32) + (carry as u32));
     }
+
+    // IX/IY Bit Operations
+    pub fn bit_ix_d(&mut self, bit: u8, offset: i8) {
+        let address = self.ix.wrapping_add(offset as u16);
+        let value = self.read_byte(address);
+        self.bit(bit, value);
+    }
+
+    pub fn bit_iy_d(&mut self, bit: u8, offset: i8) {
+        let address = self.iy.wrapping_add(offset as u16);
+        let value = self.read_byte(address);
+        self.bit(bit, value);
+    }
+
+    pub fn set_ix_d(&mut self, bit: u8, offset: i8) {
+        let address = self.ix.wrapping_add(offset as u16);
+        let mut value = self.read_byte(address);
+        self.set_bit(bit, &mut value);
+        self.write_byte(address, value);
+    }
+
+    pub fn set_iy_d(&mut self, bit: u8, offset: i8) {
+        let address = self.iy.wrapping_add(offset as u16);
+        let mut value = self.read_byte(address);
+        self.set_bit(bit, &mut value);
+        self.write_byte(address, value);
+    }
+
+    pub fn res_ix_d(&mut self, bit: u8, offset: i8) {
+        let address = self.ix.wrapping_add(offset as u16);
+        let mut value = self.read_byte(address);
+        self.res_bit(bit, &mut value);
+        self.write_byte(address, value);
+    }
+
+    pub fn res_iy_d(&mut self, bit: u8, offset: i8) {
+        let address = self.iy.wrapping_add(offset as u16);
+        let mut value = self.read_byte(address);
+        self.res_bit(bit, &mut value);
+        self.write_byte(address, value);
+    }
+
+    // IX/IY Arithmetic Operations
+    pub fn add_a_ix_d(&mut self, offset: i8) {
+        let address = self.ix.wrapping_add(offset as u16);
+        let value = self.read_byte(address);
+        self.add_a(value);
+    }
+
+    pub fn add_a_iy_d(&mut self, offset: i8) {
+        let address = self.iy.wrapping_add(offset as u16);
+        let value = self.read_byte(address);
+        self.add_a(value);
+    }
+
+    pub fn adc_a_ix_d(&mut self, offset: i8) {
+        let address = self.ix.wrapping_add(offset as u16);
+        let value = self.read_byte(address);
+        self.adc_a(value);
+    }
+
+    pub fn adc_a_iy_d(&mut self, offset: i8) {
+        let address = self.iy.wrapping_add(offset as u16);
+        let value = self.read_byte(address);
+        self.adc_a(value);
+    }
+
+    pub fn sub_ix_d(&mut self, offset: i8) {
+        let address = self.ix.wrapping_add(offset as u16);
+        let value = self.read_byte(address);
+        self.sub_a(value);
+    }
+
+    pub fn sub_iy_d(&mut self, offset: i8) {
+        let address = self.iy.wrapping_add(offset as u16);
+        let value = self.read_byte(address);
+        self.sub_a(value);
+    }
+
+    pub fn sbc_a_ix_d(&mut self, offset: i8) {
+        let address = self.ix.wrapping_add(offset as u16);
+        let value = self.read_byte(address);
+        self.sbc_a(value);
+    }
+
+    pub fn sbc_a_iy_d(&mut self, offset: i8) {
+        let address = self.iy.wrapping_add(offset as u16);
+        let value = self.read_byte(address);
+        self.sbc_a(value);
+    }
+
+    // IX/IY Increment/Decrement
+    pub fn inc_ix_d(&mut self, offset: i8) {
+        let address = self.ix.wrapping_add(offset as u16);
+        let value = self.read_byte(address);
+        let result = self.inc(value);
+        self.write_byte(address, result);
+    }
+
+    pub fn inc_iy_d(&mut self, offset: i8) {
+        let address = self.iy.wrapping_add(offset as u16);
+        let value = self.read_byte(address);
+        let result = self.inc(value);
+        self.write_byte(address, result);
+    }
+
+    pub fn dec_ix_d(&mut self, offset: i8) {
+        let address = self.ix.wrapping_add(offset as u16);
+        let value = self.read_byte(address);
+        let result = self.dec(value);
+        self.write_byte(address, result);
+    }
+
+    pub fn dec_iy_d(&mut self, offset: i8) {
+        let address = self.iy.wrapping_add(offset as u16);
+        let value = self.read_byte(address);
+        let result = self.dec(value);
+        self.write_byte(address, result);
+    }
 }
 
 #[cfg(test)]
@@ -422,5 +541,109 @@ mod tests {
         cpu.iy = 0x1234;
         cpu.dec_iy();
         assert_eq!(cpu.iy, 0x1233);
+    }
+
+    #[test]
+    fn test_bit_operations_ix() {
+        let mut cpu = Cpu::new();
+        cpu.ix = 0x2000;
+        cpu.write_byte(0x2005, 0b10101010);
+
+        cpu.bit_ix_d(3, 5);
+        assert!(!cpu.get_flag(FLAG_Z));
+
+        cpu.bit_ix_d(2, 5);
+        assert!(cpu.get_flag(FLAG_Z));
+
+        cpu.set_ix_d(2, 5);
+        let result = cpu.read_byte(0x2005);
+        assert_eq!(result & (1 << 2), 1 << 2);
+
+        cpu.res_ix_d(7, 5);
+        let result = cpu.read_byte(0x2005);
+        assert_eq!(result & (1 << 7), 0);
+    }
+
+    #[test]
+    fn test_arithmetic_operations_ix() {
+        let mut cpu = Cpu::new();
+        cpu.ix = 0x2000;
+        cpu.write_byte(0x2005, 0x42);
+        cpu.a = 0x12;
+
+        cpu.add_a_ix_d(5);
+        assert_eq!(cpu.a, 0x54);
+
+        cpu.sub_ix_d(5);
+        assert_eq!(cpu.a, 0x12);
+
+        cpu.set_flag(FLAG_C, true);
+        cpu.adc_a_ix_d(5);
+        assert_eq!(cpu.a, 0x55);
+    }
+
+    #[test]
+    fn test_inc_dec_operations_ix() {
+        let mut cpu = Cpu::new();
+        cpu.ix = 0x2000;
+        cpu.write_byte(0x2005, 0x42);
+
+        cpu.inc_ix_d(5);
+        assert_eq!(cpu.read_byte(0x2005), 0x43);
+
+        cpu.dec_ix_d(5);
+        assert_eq!(cpu.read_byte(0x2005), 0x42);
+    }
+
+    #[test]
+    fn test_bit_operations_iy() {
+        let mut cpu = Cpu::new();
+        cpu.iy = 0x2000;
+        cpu.write_byte(0x2005, 0b10101010);
+
+        cpu.bit_iy_d(3, 5);
+        assert!(!cpu.get_flag(FLAG_Z));
+
+        cpu.bit_iy_d(2, 5);
+        assert!(cpu.get_flag(FLAG_Z));
+
+        cpu.set_iy_d(2, 5);
+        let result = cpu.read_byte(0x2005);
+        assert_eq!(result & (1 << 2), 1 << 2);
+
+        cpu.res_iy_d(7, 5);
+        let result = cpu.read_byte(0x2005);
+        assert_eq!(result & (1 << 7), 0);
+    }
+
+    #[test]
+    fn test_arithmetic_operations_iy() {
+        let mut cpu = Cpu::new();
+        cpu.iy = 0x2000;
+        cpu.write_byte(0x2005, 0x42);
+        cpu.a = 0x12;
+
+        cpu.add_a_iy_d(5);
+        assert_eq!(cpu.a, 0x54);
+
+        cpu.sub_iy_d(5);
+        assert_eq!(cpu.a, 0x12);
+
+        cpu.set_flag(FLAG_C, true);
+        cpu.adc_a_iy_d(5);
+        assert_eq!(cpu.a, 0x55);
+    }
+
+    #[test]
+    fn test_inc_dec_operations_iy() {
+        let mut cpu = Cpu::new();
+        cpu.iy = 0x2000;
+        cpu.write_byte(0x2005, 0x42);
+
+        cpu.inc_iy_d(5);
+        assert_eq!(cpu.read_byte(0x2005), 0x43);
+
+        cpu.dec_iy_d(5);
+        assert_eq!(cpu.read_byte(0x2005), 0x42);
     }
 }

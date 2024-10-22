@@ -7,6 +7,7 @@ mod io;
 mod load;
 mod logical;
 pub mod misc;
+mod undocumented;
 
 // Export only the necessary types
 use crate::cpu::{Cpu, Register};
