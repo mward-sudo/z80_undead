@@ -1,16 +1,30 @@
 #[derive(Clone, Copy)]
 pub enum Register {
-    A, B, C, D, E, H, L, F,
+    A,
+    B,
+    C,
+    D,
+    E,
+    H,
+    L,
+    F,
 }
 
 #[derive(Clone, Copy)]
 pub enum RegisterPair {
-    BC, DE, HL, AF, SP, IX, IY,
+    BC,
+    DE,
+    HL,
+    AF,
+    SP,
+    IX,
+    IY,
 }
 
 #[derive(Clone, Copy)]
 pub enum IndexRegister {
-    IX, IY,
+    IX,
+    IY,
 }
 
 impl super::Cpu {
@@ -56,18 +70,26 @@ impl super::Cpu {
         let high = (value >> 8) as u8;
         let low = value as u8;
         match pair {
-            RegisterPair::BC => { self.b = high; self.c = low; }
-            RegisterPair::DE => { self.d = high; self.e = low; }
-            RegisterPair::HL => { self.h = high; self.l = low; }
-            RegisterPair::AF => { self.a = high; self.f = low; }
+            RegisterPair::BC => {
+                self.b = high;
+                self.c = low;
+            }
+            RegisterPair::DE => {
+                self.d = high;
+                self.e = low;
+            }
+            RegisterPair::HL => {
+                self.h = high;
+                self.l = low;
+            }
+            RegisterPair::AF => {
+                self.a = high;
+                self.f = low;
+            }
             RegisterPair::SP => self.sp = value,
             RegisterPair::IX => self.ix = value,
             RegisterPair::IY => self.iy = value,
         }
-    }
-
-    pub fn get_hl(&self) -> u16 {
-        ((self.h as u16) << 8) | (self.l as u16)
     }
 }
 

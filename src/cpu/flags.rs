@@ -4,6 +4,8 @@ pub const FLAG_PV: u8 = 0x04; // Parity/Overflow
 pub const FLAG_H: u8 = 0x10; // Half Carry
 pub const FLAG_Z: u8 = 0x40; // Zero
 pub const FLAG_S: u8 = 0x80; // Sign
+pub const FLAG_Y: u8 = 0b00100000;
+pub const FLAG_X: u8 = 0b00001000;
 
 impl super::Cpu {
     pub fn set_flag(&mut self, flag: u8, value: bool) {

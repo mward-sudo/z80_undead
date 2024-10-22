@@ -34,6 +34,8 @@ pub struct Cpu {
 
     // Memory (we'll use a Vec<u8> to represent the full 64KB addressable memory)
     pub memory: Vec<u8>,
+
+    pub halted: bool,
 }
 
 impl Cpu {
@@ -63,6 +65,7 @@ impl Cpu {
             iff2: false,
             im: 0,
             memory: vec![0; 65536], // Initialize 64KB of memory
+            halted: false,
         }
     }
 
@@ -87,6 +90,71 @@ impl Cpu {
         let low = self.read_byte(address) as u16;
         let high = self.read_byte(address.wrapping_add(1)) as u16;
         (high << 8) | low
+    }
+
+    pub fn step(&mut self) {
+        if self.halted {
+            return;
+        }
+        let opcode = self.fetch_byte();
+        self.execute(opcode);
+    }
+
+    pub fn fetch_byte(&mut self) -> u8 {
+        let byte = self.read_byte(self.pc);
+        self.pc = self.pc.wrapping_add(1);
+        byte
+    }
+
+    fn execute(&mut self, opcode: u8) {
+        match opcode {
+            0x00 => self.nop(),
+            0x01 => {
+                let value = self.fetch_word();
+                self.ld_bc(value);
+            }
+            // ... implement other opcodes
+            0x76 => self.halt(),
+            _ => panic!("Unimplemented opcode: 0x{:02X}", opcode),
+        }
+    }
+
+    fn fetch_word(&mut self) -> u16 {
+        let low = self.fetch_byte() as u16;
+        let high = self.fetch_byte() as u16;
+        (high << 8) | low
+    }
+
+    fn ld_bc(&mut self, value: u16) {
+        self.b = (value >> 8) as u8;
+        self.c = (value & 0xFF) as u8;
+    }
+
+    pub fn set_hl(&mut self, value: u16) {
+        self.h = (value >> 8) as u8;
+        self.l = value as u8;
+    }
+
+    pub fn set_de(&mut self, value: u16) {
+        self.d = (value >> 8) as u8;
+        self.e = value as u8;
+    }
+
+    pub fn set_bc(&mut self, value: u16) {
+        self.b = (value >> 8) as u8;
+        self.c = value as u8;
+    }
+
+    pub fn get_hl(&self) -> u16 {
+        ((self.h as u16) << 8) | (self.l as u16)
+    }
+
+    pub fn get_de(&self) -> u16 {
+        ((self.d as u16) << 8) | (self.e as u16)
+    }
+
+    pub fn get_bc(&self) -> u16 {
+        ((self.b as u16) << 8) | (self.c as u16)
     }
 }
 
