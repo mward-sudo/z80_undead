@@ -2,19 +2,67 @@
 
 ## Project Overview
 
-This project aims to create an accurate and flexible emulator for the Zilog Z80 processor. The Z80 was a popular 8-bit microprocessor used in many classic computers and gaming systems. This emulator serves as both a learning tool and a foundation for future retro-computing projects.
+This project implements an accurate emulator for the Zilog Z80 processor. The Z80 was a popular 8-bit microprocessor used in many classic computers and gaming systems. This emulator serves as both a learning tool and a foundation for future retro-computing projects.
 
 ## Current Version
 
-**Alpha v0.0.1**
+**Alpha v0.1.0**
 
-## Changelog
+## Current State
 
-### Alpha v0.0.1 (2023-04-XX)
-- Initial project setup
-- Basic project structure established
-- README created with project goals and planned features
-- License file added (MIT License)
+### Implemented Features
+
+1. **Complete Z80 Instruction Set**
+   - All documented Z80 instructions
+   - All undocumented Z80 instructions
+   - Full IX/IY register support
+   - Comprehensive flag handling
+
+2. **CPU Core**
+   - Complete register set including alternates
+   - All addressing modes
+   - Full interrupt handling (IM 0, 1, 2)
+   - Non-maskable interrupt support
+
+3. **Memory System**
+   - Full 64KB addressable memory
+   - Memory read/write interface
+   - Basic I/O port simulation
+
+4. **Instruction Categories**
+   - 8-bit and 16-bit load operations
+   - 8-bit and 16-bit arithmetic
+   - Bit manipulation instructions
+   - Block transfer and search operations
+   - Jump, call, and return instructions
+   - I/O operations
+   - Exchange, block transfer, and search instructions
+   - Rotate and shift instructions
+
+5. **Testing**
+   - Comprehensive test suite for all instructions
+   - Flag behavior verification
+   - Edge case testing
+   - Interrupt handling tests
+
+### Next Development Phase
+
+1. **Timing Implementation**
+   - Add cycle-accurate timing
+   - Implement T-state counting
+   - Add memory wait states
+
+2. **Instruction Decoder**
+   - Implement full instruction decoder
+   - Add opcode fetch cycle
+   - Support all instruction prefixes
+
+3. **System Integration**
+   - Memory-mapped I/O support
+   - Peripheral device interface
+   - System bus emulation
+
+## Project Structure
 
 ## Goals
 
