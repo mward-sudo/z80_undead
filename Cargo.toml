@@ -3,5 +3,16 @@ name = "z80_undead"
 version = "0.0.1"
 edition = "2021"
 
+# Define the binary target
+[[bin]]
+name = "z80_undead"
+path = "src/bin/main.rs"
+
+# Define the library target
+[lib]
+name = "z80_undead"
+path = "src/lib.rs"
+
+
 [dependencies]
 

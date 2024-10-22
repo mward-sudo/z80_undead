@@ -1,6 +1,4 @@
-mod cpu;
-
-use cpu::Cpu;
+use z80_undead::cpu::Cpu;
 
 fn main() {
     let mut cpu = Cpu::new();

@@ -116,7 +116,7 @@ impl Cpu {
         self.set_flag(FLAG_S, result & 0x80 != 0);
         self.set_flag(FLAG_Z, result == 0);
         self.set_flag(FLAG_H, (a & 0x0F) + (value & 0x0F) > 0x0F);
-        self.set_flag(FLAG_PV, (a ^ value ^ 0x80) & (value ^ result) & 0x80 != 0);
+        self.set_flag(FLAG_PV, (a ^ value ^ 0x80) & (a ^ result) & 0x80 != 0);
         self.set_flag(FLAG_N, false);
         self.set_flag(FLAG_C, (a as u16) + (value as u16) > 0xFF);
 
@@ -265,5 +265,96 @@ mod tests {
         cpu.write_byte(0x1000, 3);
         cpu.add_a_hl();
         assert_eq!(cpu.a, 8);
+    }
+
+    #[test]
+    fn test_register_operations() {
+        let mut cpu = Cpu::new();
+
+        // Test 8-bit registers
+        cpu.a = 0xAA;
+        assert_eq!(cpu.a, 0xAA);
+
+        // Test 16-bit registers
+        cpu.ix = 0xBBCC;
+        assert_eq!(cpu.ix, 0xBBCC);
+
+        // Test alternate registers
+        cpu.a_alt = 0xDD;
+        assert_eq!(cpu.a_alt, 0xDD);
+    }
+
+    #[test]
+    fn test_flag_operations_extended() {
+        let mut cpu = Cpu::new();
+
+        // Test all flags
+        for &flag in &[FLAG_C, FLAG_N, FLAG_PV, FLAG_H, FLAG_Z, FLAG_S] {
+            cpu.set_flag(flag, true);
+            assert!(cpu.get_flag(flag));
+            cpu.set_flag(flag, false);
+            assert!(!cpu.get_flag(flag));
+        }
+
+        // Test combination of flags
+        cpu.set_flag(FLAG_Z | FLAG_C, true);
+        assert!(cpu.get_flag(FLAG_Z));
+        assert!(cpu.get_flag(FLAG_C));
+        assert!(!cpu.get_flag(FLAG_S));
+    }
+
+    #[test]
+    fn test_memory_operations_extended() {
+        let mut cpu = Cpu::new();
+
+        // Test edge addresses
+        cpu.write_byte(0x0000, 0x42);
+        assert_eq!(cpu.read_byte(0x0000), 0x42);
+
+        cpu.write_byte(0xFFFF, 0x24);
+        assert_eq!(cpu.read_byte(0xFFFF), 0x24);
+    }
+
+    #[test]
+    fn test_interrupt_related() {
+        let mut cpu = Cpu::new();
+
+        cpu.iff1 = true;
+        assert!(cpu.iff1);
+
+        cpu.iff2 = false;
+        assert!(!cpu.iff2);
+
+        cpu.im = 2;
+        assert_eq!(cpu.im, 2);
+    }
+
+    #[test]
+    fn test_add_a_extended() {
+        let mut cpu = Cpu::new();
+
+        // Test ADD A with IX high byte
+        cpu.a = 0x10;
+        cpu.ix = 0x2030;
+        cpu.add_a((cpu.ix >> 8) as u8);
+        assert_eq!(cpu.a, 0x30);
+
+        // Test ADD A with overflow and all flags
+        cpu.a = 0x80;
+        cpu.add_a(0x80);
+        assert_eq!(cpu.a, 0);
+        assert!(cpu.get_flag(FLAG_Z));
+        assert!(cpu.get_flag(FLAG_C));
+        assert!(cpu.get_flag(FLAG_PV));
+        assert!(!cpu.get_flag(FLAG_S));
+        assert!(!cpu.get_flag(FLAG_H)); // Changed this assertion
+        assert!(!cpu.get_flag(FLAG_N));
+
+        // Test half-carry
+        cpu.a = 0x0F;
+        cpu.add_a(0x01);
+        assert_eq!(cpu.a, 0x10);
+        assert!(cpu.get_flag(FLAG_H));
+        assert!(!cpu.get_flag(FLAG_C));
     }
 }
