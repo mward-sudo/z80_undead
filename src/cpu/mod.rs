@@ -183,6 +183,121 @@ impl Cpu {
         self.sub_a(value);
     }
 
+    /// Performs the AND A, r operation
+    ///
+    /// This function implements the AND instruction for the Z80 CPU.
+    /// It performs a bitwise AND between the accumulator (A register) and the value,
+    /// storing the result in the accumulator.
+    ///
+    /// Flags affected:
+    /// - S is set if result is negative; otherwise, it is reset.
+    /// - Z is set if result is 0; otherwise, it is reset.
+    /// - H is set.
+    /// - P/V is set if parity even; otherwise, it is reset.
+    /// - N is reset.
+    /// - C is reset.
+    pub fn and_a(&mut self, value: u8) {
+        self.a &= value;
+
+        self.set_flag(FLAG_S, self.a & 0x80 != 0);
+        self.set_flag(FLAG_Z, self.a == 0);
+        self.set_flag(FLAG_H, true);
+        self.set_flag(FLAG_PV, self.a.count_ones() % 2 == 0);
+        self.set_flag(FLAG_N, false);
+        self.set_flag(FLAG_C, false);
+    }
+
+    /// Performs the OR A, r operation
+    ///
+    /// This function implements the OR instruction for the Z80 CPU.
+    /// It performs a bitwise OR between the accumulator (A register) and the value,
+    /// storing the result in the accumulator.
+    ///
+    /// Flags affected:
+    /// - S is set if result is negative; otherwise, it is reset.
+    /// - Z is set if result is 0; otherwise, it is reset.
+    /// - H is reset.
+    /// - P/V is set if parity even; otherwise, it is reset.
+    /// - N is reset.
+    /// - C is reset.
+    pub fn or_a(&mut self, value: u8) {
+        self.a |= value;
+
+        self.set_flag(FLAG_S, self.a & 0x80 != 0);
+        self.set_flag(FLAG_Z, self.a == 0);
+        self.set_flag(FLAG_H, false);
+        self.set_flag(FLAG_PV, self.a.count_ones() % 2 == 0);
+        self.set_flag(FLAG_N, false);
+        self.set_flag(FLAG_C, false);
+    }
+
+    /// Performs the XOR A, r operation
+    ///
+    /// This function implements the XOR instruction for the Z80 CPU.
+    /// It performs a bitwise XOR between the accumulator (A register) and the value,
+    /// storing the result in the accumulator.
+    ///
+    /// Flags affected:
+    /// - S is set if result is negative; otherwise, it is reset.
+    /// - Z is set if result is 0; otherwise, it is reset.
+    /// - H is reset.
+    /// - P/V is set if parity even; otherwise, it is reset.
+    /// - N is reset.
+    /// - C is reset.
+    pub fn xor_a(&mut self, value: u8) {
+        self.a ^= value;
+
+        self.set_flag(FLAG_S, self.a & 0x80 != 0);
+        self.set_flag(FLAG_Z, self.a == 0);
+        self.set_flag(FLAG_H, false);
+        self.set_flag(FLAG_PV, self.a.count_ones() % 2 == 0);
+        self.set_flag(FLAG_N, false);
+        self.set_flag(FLAG_C, false);
+    }
+
+    // Implement specific versions for each operation
+    pub fn and_a_r(&mut self, r: u8) {
+        self.and_a(r);
+    }
+
+    pub fn and_a_n(&mut self, n: u8) {
+        self.and_a(n);
+    }
+
+    pub fn and_a_hl(&mut self) {
+        let address = self.get_hl();
+        let value = self.read_byte(address);
+        self.and_a(value);
+    }
+
+    pub fn or_a_r(&mut self, r: u8) {
+        self.or_a(r);
+    }
+
+    pub fn or_a_n(&mut self, n: u8) {
+        self.or_a(n);
+    }
+
+    pub fn or_a_hl(&mut self) {
+        let address = self.get_hl();
+        let value = self.read_byte(address);
+        self.or_a(value);
+    }
+
+    pub fn xor_a_r(&mut self, r: u8) {
+        self.xor_a(r);
+    }
+
+    pub fn xor_a_n(&mut self, n: u8) {
+        self.xor_a(n);
+    }
+
+    pub fn xor_a_hl(&mut self) {
+        let address = self.get_hl();
+        let value = self.read_byte(address);
+        self.xor_a(value);
+    }
+
     // Helper method to get the value of HL register pair
     fn get_hl(&self) -> u16 {
         ((self.h as u16) << 8) | (self.l as u16)
@@ -476,4 +591,73 @@ mod tests {
         assert!(cpu.get_flag(FLAG_H));
         assert!(!cpu.get_flag(FLAG_C));
     }
+
+    #[test]
+    fn test_and_a() {
+        let mut cpu = Cpu::new();
+
+        cpu.a = 0b11001100;
+        cpu.and_a(0b10101010);
+        assert_eq!(cpu.a, 0b10001000);
+        assert!(!cpu.get_flag(FLAG_Z));
+        assert!(cpu.get_flag(FLAG_S)); // Changed: The result is negative (bit 7 is set)
+        assert!(cpu.get_flag(FLAG_H));
+        assert!(cpu.get_flag(FLAG_PV)); // Changed: The result has even parity
+        assert!(!cpu.get_flag(FLAG_N));
+        assert!(!cpu.get_flag(FLAG_C));
+
+        cpu.a = 0xFF;
+        cpu.and_a(0x00);
+        assert_eq!(cpu.a, 0x00);
+        assert!(cpu.get_flag(FLAG_Z));
+        assert!(!cpu.get_flag(FLAG_S)); // The result is zero, so S flag should be reset
+        assert!(cpu.get_flag(FLAG_PV));
+        assert!(cpu.get_flag(FLAG_H));
+        assert!(!cpu.get_flag(FLAG_N));
+        assert!(!cpu.get_flag(FLAG_C));
+    }
+
+    #[test]
+    fn test_or_a() {
+        let mut cpu = Cpu::new();
+
+        cpu.a = 0b11001100;
+        cpu.or_a(0b10101010);
+        assert_eq!(cpu.a, 0b11101110);
+        assert!(!cpu.get_flag(FLAG_Z));
+        assert!(cpu.get_flag(FLAG_S));
+        assert!(!cpu.get_flag(FLAG_H));
+        assert!(cpu.get_flag(FLAG_PV));
+        assert!(!cpu.get_flag(FLAG_N));
+        assert!(!cpu.get_flag(FLAG_C));
+
+        cpu.a = 0x00;
+        cpu.or_a(0x00);
+        assert_eq!(cpu.a, 0x00);
+        assert!(cpu.get_flag(FLAG_Z));
+        assert!(cpu.get_flag(FLAG_PV));
+    }
+
+    #[test]
+    fn test_xor_a() {
+        let mut cpu = Cpu::new();
+
+        cpu.a = 0b11001100;
+        cpu.xor_a(0b10101010);
+        assert_eq!(cpu.a, 0b01100110);
+        assert!(!cpu.get_flag(FLAG_Z));
+        assert!(!cpu.get_flag(FLAG_S));
+        assert!(!cpu.get_flag(FLAG_H));
+        assert!(cpu.get_flag(FLAG_PV));
+        assert!(!cpu.get_flag(FLAG_N));
+        assert!(!cpu.get_flag(FLAG_C));
+
+        cpu.a = 0xFF;
+        cpu.xor_a(0xFF);
+        assert_eq!(cpu.a, 0x00);
+        assert!(cpu.get_flag(FLAG_Z));
+        assert!(cpu.get_flag(FLAG_PV));
+    }
+
+    // Add more tests for and_a_r, and_a_n, and_a_hl, or_a_r, or_a_n, or_a_hl, xor_a_r, xor_a_n, xor_a_hl
 }
