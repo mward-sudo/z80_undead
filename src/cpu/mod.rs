@@ -140,6 +140,49 @@ impl Cpu {
         self.add_a(value);
     }
 
+    /// Performs the SUB A, r operation
+    ///
+    /// This function implements the SUB instruction for the Z80 CPU.
+    /// It subtracts the value from the accumulator (A register) and updates the flags accordingly.
+    ///
+    /// Flags affected:
+    /// - S is set if result is negative; otherwise, it is reset.
+    /// - Z is set if result is 0; otherwise, it is reset.
+    /// - H is set if borrow from bit 4; otherwise, it is reset.
+    /// - P/V is set if overflow; otherwise, it is reset.
+    /// - N is set.
+    /// - C is set if borrow; otherwise, it is reset.
+    pub fn sub_a(&mut self, value: u8) {
+        let a = self.a;
+        let result = a.wrapping_sub(value);
+
+        self.set_flag(FLAG_S, result & 0x80 != 0);
+        self.set_flag(FLAG_Z, result == 0);
+        self.set_flag(FLAG_H, (a & 0x0F) < (value & 0x0F));
+        self.set_flag(FLAG_PV, (a ^ value) & (a ^ result) & 0x80 != 0);
+        self.set_flag(FLAG_N, true);
+        self.set_flag(FLAG_C, a < value);
+
+        self.a = result;
+    }
+
+    /// SUB A, r
+    pub fn sub_a_r(&mut self, r: u8) {
+        self.sub_a(r);
+    }
+
+    /// SUB A, n
+    pub fn sub_a_n(&mut self, n: u8) {
+        self.sub_a(n);
+    }
+
+    /// SUB A, (HL)
+    pub fn sub_a_hl(&mut self) {
+        let address = self.get_hl();
+        let value = self.read_byte(address);
+        self.sub_a(value);
+    }
+
     // Helper method to get the value of HL register pair
     fn get_hl(&self) -> u16 {
         ((self.h as u16) << 8) | (self.l as u16)
@@ -265,6 +308,82 @@ mod tests {
         cpu.write_byte(0x1000, 3);
         cpu.add_a_hl();
         assert_eq!(cpu.a, 8);
+    }
+
+    #[test]
+    fn test_sub_a() {
+        let mut cpu = Cpu::new();
+
+        // Test basic subtraction
+        cpu.a = 10;
+        cpu.sub_a(3);
+        assert_eq!(cpu.a, 7);
+        assert!(!cpu.get_flag(FLAG_Z));
+        assert!(!cpu.get_flag(FLAG_S));
+        assert!(!cpu.get_flag(FLAG_C));
+        assert!(!cpu.get_flag(FLAG_PV));
+        assert!(cpu.get_flag(FLAG_N));
+
+        // Test subtraction resulting in zero
+        cpu.a = 5;
+        cpu.sub_a(5);
+        assert_eq!(cpu.a, 0);
+        assert!(cpu.get_flag(FLAG_Z));
+        assert!(cpu.get_flag(FLAG_N));
+
+        // Test subtraction with borrow
+        cpu.a = 3;
+        cpu.sub_a(5);
+        assert_eq!(cpu.a, 254);
+        assert!(cpu.get_flag(FLAG_S));
+        assert!(cpu.get_flag(FLAG_C));
+        assert!(cpu.get_flag(FLAG_N));
+
+        // Test subtraction causing half-borrow
+        cpu.a = 0x10;
+        cpu.sub_a(1);
+        assert_eq!(cpu.a, 0x0F);
+        assert!(cpu.get_flag(FLAG_H));
+        assert!(cpu.get_flag(FLAG_N));
+
+        // Test subtraction causing overflow
+        cpu.a = 127;
+        cpu.sub_a(255);
+        assert_eq!(cpu.a, 128);
+        assert!(cpu.get_flag(FLAG_PV));
+        assert!(cpu.get_flag(FLAG_S));
+        assert!(cpu.get_flag(FLAG_N));
+    }
+
+    #[test]
+    fn test_sub_a_r() {
+        let mut cpu = Cpu::new();
+        cpu.a = 10;
+        cpu.b = 3;
+        cpu.sub_a_r(cpu.b);
+        assert_eq!(cpu.a, 7);
+        assert!(cpu.get_flag(FLAG_N));
+    }
+
+    #[test]
+    fn test_sub_a_n() {
+        let mut cpu = Cpu::new();
+        cpu.a = 10;
+        cpu.sub_a_n(3);
+        assert_eq!(cpu.a, 7);
+        assert!(cpu.get_flag(FLAG_N));
+    }
+
+    #[test]
+    fn test_sub_a_hl() {
+        let mut cpu = Cpu::new();
+        cpu.a = 10;
+        cpu.h = 0x10;
+        cpu.l = 0x00;
+        cpu.write_byte(0x1000, 3);
+        cpu.sub_a_hl();
+        assert_eq!(cpu.a, 7);
+        assert!(cpu.get_flag(FLAG_N));
     }
 
     #[test]
