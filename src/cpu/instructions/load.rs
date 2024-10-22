@@ -109,6 +109,47 @@ impl Cpu {
         self.sp = self.sp.wrapping_add(2);
         value
     }
+
+    /// Load SP into memory at address nn
+    pub fn ld_nn_sp(&mut self, address: u16) {
+        self.write_word(address, self.sp);
+    }
+
+    /// Load HL into memory at address nn
+    pub fn ld_nn_hl(&mut self, address: u16) {
+        self.write_word(address, self.get_hl());
+    }
+
+    /// Load IX into memory at address nn
+    pub fn ld_nn_ix(&mut self, address: u16) {
+        self.write_word(address, self.ix);
+    }
+
+    /// Load IY into memory at address nn
+    pub fn ld_nn_iy(&mut self, address: u16) {
+        self.write_word(address, self.iy);
+    }
+
+    /// Exchange HL with the value at the top of the stack
+    pub fn ex_sp_hl(&mut self) {
+        let temp = self.read_word(self.sp);
+        self.write_word(self.sp, self.get_hl());
+        self.set_hl(temp);
+    }
+
+    /// Exchange IX with the value at the top of the stack
+    pub fn ex_sp_ix(&mut self) {
+        let temp = self.read_word(self.sp);
+        self.write_word(self.sp, self.ix);
+        self.ix = temp;
+    }
+
+    /// Exchange IY with the value at the top of the stack
+    pub fn ex_sp_iy(&mut self) {
+        let temp = self.read_word(self.sp);
+        self.write_word(self.sp, self.iy);
+        self.iy = temp;
+    }
 }
 
 #[cfg(test)]
@@ -140,4 +181,69 @@ mod tests {
     }
 
     // Add more tests for other load instructions...
+
+    #[test]
+    fn test_ld_nn_sp() {
+        let mut cpu = Cpu::new();
+        cpu.sp = 0x1234;
+        cpu.ld_nn_sp(0x2000);
+        assert_eq!(cpu.read_word(0x2000), 0x1234);
+    }
+
+    #[test]
+    fn test_ld_nn_hl() {
+        let mut cpu = Cpu::new();
+        cpu.set_hl(0x5678);
+        cpu.ld_nn_hl(0x2000);
+        assert_eq!(cpu.read_word(0x2000), 0x5678);
+    }
+
+    #[test]
+    fn test_ld_nn_ix() {
+        let mut cpu = Cpu::new();
+        cpu.ix = 0x9ABC;
+        cpu.ld_nn_ix(0x2000);
+        assert_eq!(cpu.read_word(0x2000), 0x9ABC);
+    }
+
+    #[test]
+    fn test_ld_nn_iy() {
+        let mut cpu = Cpu::new();
+        cpu.iy = 0xDEF0;
+        cpu.ld_nn_iy(0x2000);
+        assert_eq!(cpu.read_word(0x2000), 0xDEF0);
+    }
+
+    #[test]
+    fn test_ex_sp_hl() {
+        let mut cpu = Cpu::new();
+        cpu.set_hl(0x1234);
+        cpu.sp = 0x2000;
+        cpu.write_word(cpu.sp, 0x5678);
+        cpu.ex_sp_hl();
+        assert_eq!(cpu.get_hl(), 0x5678);
+        assert_eq!(cpu.read_word(cpu.sp), 0x1234);
+    }
+
+    #[test]
+    fn test_ex_sp_ix() {
+        let mut cpu = Cpu::new();
+        cpu.ix = 0x1234;
+        cpu.sp = 0x2000;
+        cpu.write_word(cpu.sp, 0x5678);
+        cpu.ex_sp_ix();
+        assert_eq!(cpu.ix, 0x5678);
+        assert_eq!(cpu.read_word(cpu.sp), 0x1234);
+    }
+
+    #[test]
+    fn test_ex_sp_iy() {
+        let mut cpu = Cpu::new();
+        cpu.iy = 0x1234;
+        cpu.sp = 0x2000;
+        cpu.write_word(cpu.sp, 0x5678);
+        cpu.ex_sp_iy();
+        assert_eq!(cpu.iy, 0x5678);
+        assert_eq!(cpu.read_word(cpu.sp), 0x1234);
+    }
 }

@@ -83,6 +83,58 @@ impl Cpu {
             }
         }
     }
+
+    // New instructions
+
+    pub fn ind(&mut self) {
+        let port = self.c;
+        let value = self.in_r_c(Register::A, port);
+        let hl = self.get_hl();
+        self.write_byte(hl, value);
+        self.set_hl(hl.wrapping_sub(1));
+        self.b = self.b.wrapping_sub(1);
+
+        self.set_flag(FLAG_Z, self.b == 0);
+        self.set_flag(FLAG_N, true);
+        let temp = value.wrapping_add((hl & 0xFF) as u8);
+        self.set_flag(FLAG_H, temp < value);
+        self.set_flag(FLAG_C, temp < value);
+        self.set_flag(FLAG_PV, self.b != 0);
+    }
+
+    pub fn indr(&mut self) {
+        while self.b != 0 {
+            self.ind();
+            self.c = self.c.wrapping_sub(1);
+            if self.b == 0 {
+                self.set_flag(FLAG_PV, false);
+                break;
+            }
+        }
+    }
+
+    pub fn outd(&mut self) {
+        let hl = self.get_hl();
+        let value = self.read_byte(hl);
+        self.write_byte(0xFF00 | (self.c as u16), value);
+        self.set_hl(hl.wrapping_sub(1));
+        self.b = self.b.wrapping_sub(1);
+
+        self.set_flag(FLAG_Z, self.b == 0);
+        self.set_flag(FLAG_N, true);
+        let l = (hl & 0xFF) as u8;
+        self.set_flag(FLAG_H, l.wrapping_add(value) < l);
+        self.set_flag(FLAG_C, l.wrapping_add(value) < l);
+        self.set_flag(FLAG_PV, self.b != 0x7F);
+    }
+
+    pub fn otdr(&mut self) {
+        while self.b != 0 {
+            self.outd();
+        }
+        // Ensure PV flag is reset after the operation completes
+        self.set_flag(FLAG_PV, false);
+    }
 }
 
 #[cfg(test)]
@@ -160,6 +212,93 @@ mod tests {
         assert_eq!(cpu.c, 0x13);
         assert!(cpu.get_flag(FLAG_Z));
         assert!(cpu.get_flag(FLAG_N));
+        assert!(!cpu.get_flag(FLAG_PV));
+    }
+
+    #[test]
+    fn test_ind() {
+        let mut cpu = Cpu::new();
+        cpu.b = 0x03;
+        cpu.c = 0x10;
+        cpu.set_hl(0x2000);
+        cpu.write_byte(0xFF10, 0xAA); // Simulate I/O port 0x10 containing 0xAA
+
+        cpu.ind();
+
+        assert_eq!(cpu.read_byte(0x2000), 0xAA);
+        assert_eq!(cpu.get_hl(), 0x1FFF);
+        assert_eq!(cpu.b, 0x02);
+        assert!(!cpu.get_flag(FLAG_Z));
+        assert!(cpu.get_flag(FLAG_N));
+        assert!(cpu.get_flag(FLAG_PV));
+    }
+
+    #[test]
+    fn test_indr() {
+        let mut cpu = Cpu::new();
+        cpu.b = 0x03;
+        cpu.c = 0x12;
+        cpu.set_hl(0x2002);
+        cpu.write_byte(0xFF12, 0xAA);
+        cpu.write_byte(0xFF11, 0xBB);
+        cpu.write_byte(0xFF10, 0xCC);
+
+        cpu.indr();
+
+        assert_eq!(cpu.read_byte(0x2002), 0xAA);
+        assert_eq!(cpu.read_byte(0x2001), 0xBB);
+        assert_eq!(cpu.read_byte(0x2000), 0xCC);
+        assert_eq!(cpu.get_hl(), 0x1FFF);
+        assert_eq!(cpu.b, 0x00);
+        assert_eq!(cpu.c, 0x0F);
+        assert!(cpu.get_flag(FLAG_Z));
+        assert!(cpu.get_flag(FLAG_N));
+        assert!(!cpu.get_flag(FLAG_PV));
+    }
+
+    #[test]
+    fn test_outd() {
+        let mut cpu = Cpu::new();
+        cpu.b = 0x03;
+        cpu.c = 0x10;
+        cpu.set_hl(0x2000);
+        cpu.write_byte(0x2000, 0xAA);
+
+        cpu.outd();
+
+        assert_eq!(cpu.read_byte(0xFF10), 0xAA);
+        assert_eq!(cpu.get_hl(), 0x1FFF);
+        assert_eq!(cpu.b, 0x02);
+        assert!(!cpu.get_flag(FLAG_Z));
+        assert!(cpu.get_flag(FLAG_N));
+        assert!(cpu.get_flag(FLAG_PV));
+    }
+
+    #[test]
+    fn test_otdr() {
+        let mut cpu = Cpu::new();
+        cpu.b = 0x03;
+        cpu.c = 0x12;
+        cpu.set_hl(0x2002);
+        cpu.write_byte(0x2002, 0xAA);
+        cpu.write_byte(0x2001, 0xBB);
+        cpu.write_byte(0x2000, 0xCC);
+
+        cpu.otdr();
+
+        // Check that the last byte written to the port is 0xCC
+        assert_eq!(cpu.read_byte(0xFF12), 0xCC);
+        // Check that the HL register is decremented correctly
+        assert_eq!(cpu.get_hl(), 0x1FFF);
+        // Check that the B register is decremented to 0
+        assert_eq!(cpu.b, 0x00);
+        // Check that the C register remains unchanged
+        assert_eq!(cpu.c, 0x12);
+        // Check that the Z flag is set
+        assert!(cpu.get_flag(FLAG_Z));
+        // Check that the N flag is set
+        assert!(cpu.get_flag(FLAG_N));
+        // Check that the PV flag is reset
         assert!(!cpu.get_flag(FLAG_PV));
     }
 }

@@ -75,6 +75,32 @@ impl Cpu {
         result
     }
 
+    // New instructions
+
+    pub fn rlca(&mut self) {
+        self.a = self.rlc(self.a);
+        self.set_flag(FLAG_H, false);
+        self.set_flag(FLAG_N, false);
+    }
+
+    pub fn rrca(&mut self) {
+        self.a = self.rrc(self.a);
+        self.set_flag(FLAG_H, false);
+        self.set_flag(FLAG_N, false);
+    }
+
+    pub fn rla(&mut self) {
+        self.a = self.rl(self.a);
+        self.set_flag(FLAG_H, false);
+        self.set_flag(FLAG_N, false);
+    }
+
+    pub fn rra(&mut self) {
+        self.a = self.rr(self.a);
+        self.set_flag(FLAG_H, false);
+        self.set_flag(FLAG_N, false);
+    }
+
     fn update_rotation_flags(&mut self, result: u8) {
         self.set_flag(FLAG_S, result & 0x80 != 0);
         self.set_flag(FLAG_Z, result == 0);
@@ -163,5 +189,81 @@ mod tests {
         let srl_result = cpu.srl(0b10000001);
         assert_eq!(srl_result, 0b01000000);
         assert!(cpu.get_flag(FLAG_C));
+    }
+
+    #[test]
+    fn test_rlca() {
+        let mut cpu = Cpu::new();
+        cpu.a = 0b10000001;
+        cpu.rlca();
+        assert_eq!(cpu.a, 0b00000011);
+        assert!(cpu.get_flag(FLAG_C));
+        assert!(!cpu.get_flag(FLAG_H));
+        assert!(!cpu.get_flag(FLAG_N));
+    }
+
+    #[test]
+    fn test_rrca() {
+        let mut cpu = Cpu::new();
+        cpu.a = 0b10000001;
+        cpu.rrca();
+        assert_eq!(cpu.a, 0b11000000);
+        assert!(cpu.get_flag(FLAG_C));
+        assert!(!cpu.get_flag(FLAG_H));
+        assert!(!cpu.get_flag(FLAG_N));
+    }
+
+    #[test]
+    fn test_rla() {
+        let mut cpu = Cpu::new();
+        cpu.a = 0b10000001;
+        cpu.set_flag(FLAG_C, true);
+        cpu.rla();
+        assert_eq!(cpu.a, 0b00000011);
+        assert!(cpu.get_flag(FLAG_C));
+        assert!(!cpu.get_flag(FLAG_H));
+        assert!(!cpu.get_flag(FLAG_N));
+    }
+
+    #[test]
+    fn test_rra() {
+        let mut cpu = Cpu::new();
+        cpu.a = 0b10000001;
+        cpu.set_flag(FLAG_C, true);
+        cpu.rra();
+        assert_eq!(cpu.a, 0b11000000);
+        assert!(cpu.get_flag(FLAG_C));
+        assert!(!cpu.get_flag(FLAG_H));
+        assert!(!cpu.get_flag(FLAG_N));
+    }
+
+    #[test]
+    fn test_sla() {
+        let mut cpu = Cpu::new();
+        let result = cpu.sla(0b10000001);
+        assert_eq!(result, 0b00000010);
+        assert!(cpu.get_flag(FLAG_C));
+        assert!(!cpu.get_flag(FLAG_H));
+        assert!(!cpu.get_flag(FLAG_N));
+    }
+
+    #[test]
+    fn test_sra() {
+        let mut cpu = Cpu::new();
+        let result = cpu.sra(0b10000001);
+        assert_eq!(result, 0b11000000);
+        assert!(cpu.get_flag(FLAG_C));
+        assert!(!cpu.get_flag(FLAG_H));
+        assert!(!cpu.get_flag(FLAG_N));
+    }
+
+    #[test]
+    fn test_srl() {
+        let mut cpu = Cpu::new();
+        let result = cpu.srl(0b10000001);
+        assert_eq!(result, 0b01000000);
+        assert!(cpu.get_flag(FLAG_C));
+        assert!(!cpu.get_flag(FLAG_H));
+        assert!(!cpu.get_flag(FLAG_N));
     }
 }

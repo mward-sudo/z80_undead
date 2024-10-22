@@ -40,17 +40,6 @@ impl Cpu {
             self.pc = self.pc.wrapping_add(offset as u16);
         }
     }
-
-    pub fn reti(&mut self) {
-        self.ret(true);
-        self.iff1 = true;
-        self.iff2 = true;
-    }
-
-    pub fn retn(&mut self) {
-        self.ret(true);
-        self.iff1 = self.iff2;
-    }
 }
 
 #[cfg(test)]
@@ -123,37 +112,6 @@ mod tests {
         cpu.djnz(10);
         assert_eq!(cpu.pc, 0x100A);
         assert_eq!(cpu.b, 0);
-    }
-
-    #[test]
-    fn test_reti_and_retn() {
-        let mut cpu = Cpu::new();
-
-        // Test RETI
-        cpu.sp = 0xFFFE;
-        cpu.memory[0xFFFE] = 0x00;
-        cpu.memory[0xFFFF] = 0x20;
-        cpu.iff1 = false;
-        cpu.iff2 = false;
-
-        cpu.reti();
-
-        assert_eq!(cpu.pc, 0x2000);
-        assert!(cpu.iff1);
-        assert!(cpu.iff2);
-
-        // Test RETN
-        cpu.sp = 0xFFFE;
-        cpu.memory[0xFFFE] = 0x00;
-        cpu.memory[0xFFFF] = 0x40;
-        cpu.iff1 = false;
-        cpu.iff2 = true;
-
-        cpu.retn();
-
-        assert_eq!(cpu.pc, 0x4000);
-        assert!(cpu.iff1);
-        assert!(cpu.iff2);
     }
 
     #[test]
