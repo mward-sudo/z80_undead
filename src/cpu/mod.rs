@@ -302,6 +302,158 @@ impl Cpu {
     fn get_hl(&self) -> u16 {
         ((self.h as u16) << 8) | (self.l as u16)
     }
+
+    /// LD r, r' - Load register r with value from register r'
+    pub fn ld_r_r(&mut self, dest: Register, src: Register) {
+        let value = self.read_register(src);
+        self.write_register(dest, value);
+    }
+
+    /// LD r, n - Load register r with value n
+    pub fn ld_r_n(&mut self, dest: Register, n: u8) {
+        self.write_register(dest, n);
+    }
+
+    /// LD r, (HL) - Load register r with value from memory address (HL)
+    pub fn ld_r_hl(&mut self, dest: Register) {
+        let address = self.get_hl();
+        let value = self.read_byte(address);
+        self.write_register(dest, value);
+    }
+
+    /// LD (HL), r - Store value from register r into memory address (HL)
+    pub fn ld_hl_r(&mut self, src: Register) {
+        let value = self.read_register(src);
+        let address = self.get_hl();
+        self.write_byte(address, value);
+    }
+
+    /// LD (HL), n - Store value n into memory address (HL)
+    pub fn ld_hl_n(&mut self, n: u8) {
+        let address = self.get_hl();
+        self.write_byte(address, n);
+    }
+
+    /// LD A, (BC)/(DE)/(nn) - Load A with value from memory address in BC, DE, or nn
+    pub fn ld_a_bc_de_nn(&mut self, address: u16) {
+        self.a = self.read_byte(address);
+    }
+
+    /// LD (BC)/(DE)/(nn), A - Store value from A into memory address in BC, DE, or nn
+    pub fn ld_bc_de_nn_a(&mut self, address: u16) {
+        self.write_byte(address, self.a);
+    }
+
+    /// LD dd, nn - Load 16-bit register pair dd with value nn
+    pub fn ld_dd_nn(&mut self, dest: RegisterPair, nn: u16) {
+        self.write_register_pair(dest, nn);
+    }
+
+    /// LD IX/IY, nn - Load IX or IY with value nn
+    pub fn ld_ix_iy_nn(&mut self, dest: IndexRegister, nn: u16) {
+        match dest {
+            IndexRegister::IX => self.ix = nn,
+            IndexRegister::IY => self.iy = nn,
+        }
+    }
+
+    /// LD SP, HL/IX/IY - Load SP with value from HL, IX, or IY
+    pub fn ld_sp_hl_ix_iy(&mut self, src: RegisterPair) {
+        self.sp = self.read_register_pair(src);
+    }
+
+    /// PUSH qq - Push register pair qq onto stack
+    pub fn push_qq(&mut self, src: RegisterPair) {
+        let value = self.read_register_pair(src);
+        self.sp = self.sp.wrapping_sub(2);
+        self.write_word(self.sp, value);
+    }
+
+    /// POP qq - Pop value from stack into register pair qq
+    pub fn pop_qq(&mut self, dest: RegisterPair) {
+        let value = self.read_word(self.sp);
+        self.sp = self.sp.wrapping_add(2);
+        self.write_register_pair(dest, value);
+    }
+
+    // Helper method to write a 16-bit word to memory
+    fn write_word(&mut self, address: u16, value: u16) {
+        self.write_byte(address, (value & 0xFF) as u8);
+        self.write_byte(address.wrapping_add(1), (value >> 8) as u8);
+    }
+
+    // Helper method to read a 16-bit word from memory
+    fn read_word(&self, address: u16) -> u16 {
+        let low = self.read_byte(address) as u16;
+        let high = self.read_byte(address.wrapping_add(1)) as u16;
+        (high << 8) | low
+    }
+
+    // Helper methods for register operations
+    fn read_register(&self, reg: Register) -> u8 {
+        match reg {
+            Register::A => self.a,
+            Register::B => self.b,
+            Register::C => self.c,
+            Register::D => self.d,
+            Register::E => self.e,
+            Register::H => self.h,
+            Register::L => self.l,
+            Register::F => self.f,
+        }
+    }
+
+    fn write_register(&mut self, reg: Register, value: u8) {
+        match reg {
+            Register::A => self.a = value,
+            Register::B => self.b = value,
+            Register::C => self.c = value,
+            Register::D => self.d = value,
+            Register::E => self.e = value,
+            Register::H => self.h = value,
+            Register::L => self.l = value,
+            Register::F => self.f = value,
+        }
+    }
+
+    // Helper methods for register pair operations
+    fn read_register_pair(&self, pair: RegisterPair) -> u16 {
+        match pair {
+            RegisterPair::BC => ((self.b as u16) << 8) | (self.c as u16),
+            RegisterPair::DE => ((self.d as u16) << 8) | (self.e as u16),
+            RegisterPair::HL => ((self.h as u16) << 8) | (self.l as u16),
+            RegisterPair::AF => ((self.a as u16) << 8) | (self.f as u16),
+            RegisterPair::SP => self.sp,
+            RegisterPair::IX => self.ix,
+            RegisterPair::IY => self.iy,
+        }
+    }
+
+    fn write_register_pair(&mut self, pair: RegisterPair, value: u16) {
+        let high = (value >> 8) as u8;
+        let low = value as u8;
+        match pair {
+            RegisterPair::BC => {
+                self.b = high;
+                self.c = low;
+            }
+            RegisterPair::DE => {
+                self.d = high;
+                self.e = low;
+            }
+            RegisterPair::HL => {
+                self.h = high;
+                self.l = low;
+            }
+            RegisterPair::AF => {
+                self.a = high;
+                self.f = low;
+            }
+            RegisterPair::SP => self.sp = value,
+            RegisterPair::IX => self.ix = value,
+            RegisterPair::IY => self.iy = value,
+        }
+    }
 }
 
 // Flag bit positions
@@ -311,6 +463,35 @@ const FLAG_PV: u8 = 0x04; // Parity/Overflow
 const FLAG_H: u8 = 0x10; // Half Carry
 const FLAG_Z: u8 = 0x40; // Zero
 const FLAG_S: u8 = 0x80; // Sign
+
+#[derive(Clone, Copy)]
+pub enum Register {
+    A,
+    B,
+    C,
+    D,
+    E,
+    H,
+    L,
+    F,
+}
+
+#[derive(Clone, Copy)]
+pub enum RegisterPair {
+    BC,
+    DE,
+    HL,
+    AF,
+    SP,
+    IX,
+    IY,
+}
+
+#[derive(Clone, Copy)]
+pub enum IndexRegister {
+    IX,
+    IY,
+}
 
 #[cfg(test)]
 mod tests {
@@ -657,6 +838,78 @@ mod tests {
         assert_eq!(cpu.a, 0x00);
         assert!(cpu.get_flag(FLAG_Z));
         assert!(cpu.get_flag(FLAG_PV));
+    }
+
+    #[test]
+    fn test_load_instructions() {
+        let mut cpu = Cpu::new();
+
+        // Test LD r, r'
+        cpu.b = 0x12;
+        cpu.ld_r_r(Register::C, Register::B);
+        assert_eq!(cpu.c, 0x12);
+
+        // Test LD r, n
+        cpu.ld_r_n(Register::D, 0x34);
+        assert_eq!(cpu.d, 0x34);
+
+        // Test LD r, (HL)
+        cpu.h = 0x56;
+        cpu.l = 0x78;
+        cpu.write_byte(0x5678, 0x9A);
+        cpu.ld_r_hl(Register::E);
+        assert_eq!(cpu.e, 0x9A);
+
+        // Test LD (HL), r
+        cpu.a = 0xBC;
+        cpu.ld_hl_r(Register::A);
+        assert_eq!(cpu.read_byte(0x5678), 0xBC);
+
+        // Test LD (HL), n
+        cpu.ld_hl_n(0xDE);
+        assert_eq!(cpu.read_byte(0x5678), 0xDE);
+
+        // Test LD A, (BC)
+        cpu.b = 0x12;
+        cpu.c = 0x34;
+        cpu.write_byte(0x1234, 0xEF);
+        cpu.ld_a_bc_de_nn(0x1234);
+        assert_eq!(cpu.a, 0xEF);
+
+        // Test LD (DE), A
+        cpu.d = 0x56;
+        cpu.e = 0x78;
+        cpu.a = 0xAB;
+        cpu.ld_bc_de_nn_a(0x5678);
+        assert_eq!(cpu.read_byte(0x5678), 0xAB);
+
+        // Test LD dd, nn
+        cpu.ld_dd_nn(RegisterPair::BC, 0xCDEF);
+        assert_eq!(cpu.b, 0xCD);
+        assert_eq!(cpu.c, 0xEF);
+
+        // Test LD IX, nn
+        cpu.ld_ix_iy_nn(IndexRegister::IX, 0x1122);
+        assert_eq!(cpu.ix, 0x1122);
+
+        // Test LD SP, HL
+        cpu.h = 0x33;
+        cpu.l = 0x44;
+        cpu.ld_sp_hl_ix_iy(RegisterPair::HL);
+        assert_eq!(cpu.sp, 0x3344);
+
+        // Test PUSH qq
+        cpu.sp = 0xFFFF;
+        cpu.ld_dd_nn(RegisterPair::BC, 0x5566);
+        cpu.push_qq(RegisterPair::BC);
+        assert_eq!(cpu.sp, 0xFFFD);
+        assert_eq!(cpu.read_word(0xFFFD), 0x5566);
+
+        // Test POP qq
+        cpu.pop_qq(RegisterPair::DE);
+        assert_eq!(cpu.d, 0x55);
+        assert_eq!(cpu.e, 0x66);
+        assert_eq!(cpu.sp, 0xFFFF);
     }
 
     // Add more tests for and_a_r, and_a_n, and_a_hl, or_a_r, or_a_n, or_a_hl, xor_a_r, xor_a_n, xor_a_hl
