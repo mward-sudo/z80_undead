@@ -87,3 +87,78 @@ fn test_flag_operations() {
     assert!(!cpu.get_flag(FLAG_PV));
     assert!(cpu.get_flag(FLAG_S));
 }
+
+#[test]
+fn test_add_a() {
+    let mut cpu = Cpu::new();
+
+    // Test basic addition
+    cpu.a = 5;
+    cpu.add_a(3);
+    assert_eq!(cpu.a, 8);
+    assert!(!cpu.get_flag(FLAG_Z));
+    assert!(!cpu.get_flag(FLAG_S));
+    assert!(!cpu.get_flag(FLAG_C));
+    assert!(!cpu.get_flag(FLAG_PV));
+
+    // Test addition resulting in zero
+    cpu.a = 0;
+    cpu.add_a(0);
+    assert_eq!(cpu.a, 0);
+    assert!(cpu.get_flag(FLAG_Z));
+
+    // Test addition with carry
+    cpu.a = 255;
+    cpu.add_a(1);
+    assert_eq!(cpu.a, 0);
+    assert!(cpu.get_flag(FLAG_Z));
+    assert!(cpu.get_flag(FLAG_C));
+
+    // Test addition causing half-carry
+    cpu.a = 0x0F;
+    cpu.add_a(1);
+    assert_eq!(cpu.a, 0x10);
+    assert!(cpu.get_flag(FLAG_H));
+
+    // Test addition causing overflow
+    cpu.a = 127;
+    cpu.add_a(1);
+    assert_eq!(cpu.a, 128);
+    assert!(cpu.get_flag(FLAG_PV));
+    assert!(cpu.get_flag(FLAG_S));
+
+    // Test addition with negative result
+    cpu.a = 250;
+    cpu.add_a(10);
+    assert_eq!(cpu.a, 4);
+    assert!(cpu.get_flag(FLAG_C));
+    assert!(!cpu.get_flag(FLAG_S));
+}
+
+#[test]
+fn test_add_a_r() {
+    let mut cpu = Cpu::new();
+    cpu.a = 5;
+    cpu.b = 3;
+    cpu.add_a_r(cpu.b);
+    assert_eq!(cpu.a, 8);
+}
+
+#[test]
+fn test_add_a_n() {
+    let mut cpu = Cpu::new();
+    cpu.a = 5;
+    cpu.add_a_n(3);
+    assert_eq!(cpu.a, 8);
+}
+
+#[test]
+fn test_add_a_hl() {
+    let mut cpu = Cpu::new();
+    cpu.a = 5;
+    cpu.h = 0x10;
+    cpu.l = 0x00;
+    cpu.write_byte(0x1000, 3);
+    cpu.add_a_hl();
+    assert_eq!(cpu.a, 8);
+}
