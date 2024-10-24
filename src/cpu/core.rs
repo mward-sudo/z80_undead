@@ -40,6 +40,12 @@ pub struct Cpu {
     pub halted: bool,
 
     pub interrupt_mode: u8,
+
+    // Timing state
+    pub t_states: u64,        // Total executed T-states (clock cycles)
+    pub m_cycles: u64,        // Total executed M-cycles (machine cycles)
+    pub current_t_states: u8, // T-states for the current instruction
+    pub current_m_cycles: u8, // M-cycles for the current instruction
 }
 
 impl Cpu {
@@ -73,14 +79,22 @@ impl Cpu {
             memory: vec![0; 65536], // Initialize 64KB of memory
             halted: false,
             interrupt_mode: 0,
+            t_states: 0,
+            m_cycles: 0,
+            current_t_states: 0,
+            current_m_cycles: 0,
         }
     }
 
-    pub fn read_byte(&self, address: u16) -> u8 {
+    pub fn read_byte(&mut self, address: u16) -> u8 {
+        self.add_t_states(3); // Memory read requires 3 T-states
+        self.add_m_cycle(); // Memory access constitutes one M-cycle
         self.memory[address as usize]
     }
 
     pub fn write_byte(&mut self, address: u16, value: u8) {
+        self.add_t_states(3); // Memory write requires 3 T-states
+        self.add_m_cycle(); // Memory access constitutes one M-cycle
         self.memory[address as usize] = value;
     }
 
@@ -93,7 +107,7 @@ impl Cpu {
         self.write_byte(address.wrapping_add(1), (value >> 8) as u8);
     }
 
-    pub fn read_word(&self, address: u16) -> u16 {
+    pub fn read_word(&mut self, address: u16) -> u16 {
         let low = self.read_byte(address) as u16;
         let high = self.read_byte(address.wrapping_add(1)) as u16;
         (high << 8) | low
@@ -101,8 +115,11 @@ impl Cpu {
 
     pub fn step(&mut self) {
         if self.halted {
+            self.add_t_states(4); // Halted state consumes 4 T-states per cycle
             return;
         }
+
+        self.reset_instruction_timing();
         let opcode = self.fetch_byte();
         self.execute(opcode);
     }
@@ -163,6 +180,50 @@ impl Cpu {
     pub fn get_bc(&self) -> u16 {
         ((self.b as u16) << 8) | (self.c as u16)
     }
+
+    // Timing management methods
+    pub fn add_t_states(&mut self, states: u8) {
+        self.current_t_states += states;
+        self.t_states += states as u64;
+    }
+
+    pub fn add_m_cycle(&mut self) {
+        self.current_m_cycles += 1;
+        self.m_cycles += 1;
+    }
+
+    pub fn reset_instruction_timing(&mut self) {
+        self.current_t_states = 0;
+        self.current_m_cycles = 0;
+    }
+
+    /// Returns current timing information as (total_t_states, total_m_cycles, current_t_states, current_m_cycles)
+    pub fn get_timing_info(&self) -> (u64, u64, u8, u8) {
+        (
+            self.t_states,
+            self.m_cycles,
+            self.current_t_states,
+            self.current_m_cycles,
+        )
+    }
+
+    /// Waits until the specified number of T-states have elapsed
+    pub fn wait_states(&mut self, states: u8) {
+        self.add_t_states(states);
+    }
+
+    /// Synchronizes the CPU with external hardware by consuming remaining T-states in current M-cycle
+    pub fn sync_m_cycle(&mut self) {
+        let remaining = 4 - (self.current_t_states % 4);
+        if remaining < 4 {
+            self.add_t_states(remaining);
+        }
+    }
+
+    /// Returns the number of T-states elapsed in the current M-cycle
+    pub fn t_states_in_m_cycle(&self) -> u8 {
+        self.current_t_states % 4
+    }
 }
 
 impl Default for Cpu {
@@ -207,5 +268,119 @@ mod tests {
         assert_eq!(cpu.read_word(0x1000), 0x1234);
         assert_eq!(cpu.read_byte(0x1000), 0x34);
         assert_eq!(cpu.read_byte(0x1001), 0x12);
+    }
+
+    #[test]
+    fn test_timing_basic_memory_operations() {
+        let mut cpu = Cpu::new();
+
+        // Test memory read timing
+        cpu.read_byte(0x1000);
+        assert_eq!(cpu.current_t_states, 3);
+        assert_eq!(cpu.current_m_cycles, 1);
+
+        // Test memory write timing
+        cpu.reset_instruction_timing();
+        cpu.write_byte(0x1000, 0x42);
+        assert_eq!(cpu.current_t_states, 3);
+        assert_eq!(cpu.current_m_cycles, 1);
+    }
+
+    #[test]
+    fn test_timing_fetch_operations() {
+        let mut cpu = Cpu::new();
+
+        // Test byte fetch timing
+        cpu.fetch_byte();
+        assert_eq!(cpu.current_t_states, 3);
+        assert_eq!(cpu.current_m_cycles, 1);
+
+        // Test word fetch timing (should be 6 T-states, 2 M-cycles)
+        cpu.reset_instruction_timing();
+        cpu.fetch_word();
+        assert_eq!(cpu.current_t_states, 6);
+        assert_eq!(cpu.current_m_cycles, 2);
+    }
+
+    #[test]
+    fn test_timing_counters() {
+        let mut cpu = Cpu::new();
+
+        // Test accumulation of T-states and M-cycles
+        cpu.add_t_states(4);
+        cpu.add_m_cycle();
+        assert_eq!(cpu.t_states, 4);
+        assert_eq!(cpu.m_cycles, 1);
+
+        cpu.add_t_states(3);
+        cpu.add_m_cycle();
+        assert_eq!(cpu.t_states, 7);
+        assert_eq!(cpu.m_cycles, 2);
+    }
+
+    #[test]
+    fn test_timing_reset() {
+        let mut cpu = Cpu::new();
+
+        cpu.add_t_states(4);
+        cpu.add_m_cycle();
+        cpu.reset_instruction_timing();
+
+        assert_eq!(cpu.current_t_states, 0);
+        assert_eq!(cpu.current_m_cycles, 0);
+        // Total counts should remain unchanged
+        assert_eq!(cpu.t_states, 4);
+        assert_eq!(cpu.m_cycles, 1);
+    }
+
+    #[test]
+    fn test_wait_states() {
+        let mut cpu = Cpu::new();
+        cpu.wait_states(2);
+        assert_eq!(cpu.current_t_states, 2);
+        assert_eq!(cpu.t_states, 2);
+    }
+
+    #[test]
+    fn test_sync_m_cycle() {
+        let mut cpu = Cpu::new();
+
+        // Add 1 T-state
+        cpu.add_t_states(1);
+        cpu.sync_m_cycle();
+        assert_eq!(cpu.current_t_states, 4);
+
+        // Add 2 T-states
+        cpu.reset_instruction_timing();
+        cpu.add_t_states(2);
+        cpu.sync_m_cycle();
+        assert_eq!(cpu.current_t_states, 4);
+
+        // Add 3 T-states
+        cpu.reset_instruction_timing();
+        cpu.add_t_states(3);
+        cpu.sync_m_cycle();
+        assert_eq!(cpu.current_t_states, 4);
+
+        // Add 4 T-states (already aligned)
+        cpu.reset_instruction_timing();
+        cpu.add_t_states(4);
+        cpu.sync_m_cycle();
+        assert_eq!(cpu.current_t_states, 4);
+    }
+
+    #[test]
+    fn test_t_states_in_m_cycle() {
+        let mut cpu = Cpu::new();
+        assert_eq!(cpu.t_states_in_m_cycle(), 0);
+
+        cpu.add_t_states(1);
+        assert_eq!(cpu.t_states_in_m_cycle(), 1);
+
+        cpu.add_t_states(2);
+        assert_eq!(cpu.t_states_in_m_cycle(), 3);
+
+        cpu.add_t_states(2);
+        assert_eq!(cpu.t_states_in_m_cycle(), 1);
     }
 }
