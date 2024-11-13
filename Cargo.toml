@@ -1,0 +1,9 @@
+[package]
+name = "z80_undead"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "A Z80 emulator with RetroArch compatibility"
+authors = ["Michael Ward <michael@scripthungry.com>"]
+
+[dependencies]
