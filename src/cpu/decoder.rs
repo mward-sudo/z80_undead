@@ -21,6 +21,7 @@ pub enum Prefix {
 pub struct Decoder {
     current_prefix: Prefix,
     tables: InstructionTables,
+    current_prefix_t_states: u8,
 }
 
 impl Default for Decoder {
@@ -34,6 +35,7 @@ impl Decoder {
         Self {
             current_prefix: Prefix::None,
             tables: InstructionTables::new(),
+            current_prefix_t_states: 0,
         }
     }
 
@@ -70,35 +72,34 @@ impl Decoder {
 
     /// Decodes an opcode based on the current prefix state
     pub fn decode(&mut self, opcode: u8) -> Result<Instruction> {
-        // First check if this is a prefix byte
+        // Check for prefix byte
         if self.handle_prefix(opcode) {
+            self.current_prefix_t_states += 4; // Add T-states for prefix byte
             return Ok(PREFIX_INSTRUCTION.clone());
         }
 
-        // Look up the instruction based on current prefix
-        match self.current_prefix {
-            Prefix::None => self
-                .tables
-                .lookup_main(opcode)
-                .cloned()
-                .ok_or(crate::EmulatorError::InvalidOpcode(opcode)),
-            Prefix::Cb => self
-                .tables
-                .lookup_cb(opcode)
-                .cloned()
-                .ok_or(crate::EmulatorError::InvalidOpcode(opcode)),
-            Prefix::Dd | Prefix::Fd => self
-                .tables
-                .lookup_ddfd(opcode)
-                .cloned()
-                .ok_or(crate::EmulatorError::InvalidOpcode(opcode)),
-            Prefix::Ed => self
-                .tables
-                .lookup_ed(opcode)
-                .cloned()
-                .ok_or(crate::EmulatorError::InvalidOpcode(opcode)),
-            _ => Err(crate::EmulatorError::InvalidOpcode(opcode)),
+        // Reset prefix T-states on non-prefix instruction
+        let prefix_t_states = u32::from(self.current_prefix_t_states);
+        self.current_prefix_t_states = 0;
+
+        // Decode based on current prefix
+        let mut instruction = match self.current_prefix {
+            Prefix::None => self.tables.lookup_main(opcode),
+            Prefix::Cb => self.tables.lookup_cb(opcode),
+            Prefix::Ed => self.tables.lookup_ed(opcode),
+            Prefix::Dd | Prefix::Fd => self.tables.lookup_ddfd(opcode),
+            _ => None,
         }
+        .cloned()
+        .ok_or(crate::EmulatorError::InvalidOpcode(opcode))?;
+
+        // Add prefix timing to instruction
+        instruction.t_states += prefix_t_states;
+
+        // Reset prefix state
+        self.current_prefix = Prefix::None;
+
+        Ok(instruction)
     }
 }
 
