@@ -1,7 +1,9 @@
 //! Decoder module handles Z80 instruction decoding and prefix handling
 
-use super::instruction::{Instruction, InstructionType};
+use super::instruction::{create_nop, Instruction, InstructionType};
+use super::tables::InstructionTables;
 use crate::Result;
+use std::sync::LazyLock;
 
 /// Represents Z80 instruction prefixes
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -18,6 +20,7 @@ pub enum Prefix {
 /// The main instruction decoder
 pub struct Decoder {
     current_prefix: Prefix,
+    tables: InstructionTables,
 }
 
 impl Default for Decoder {
@@ -30,10 +33,11 @@ impl Decoder {
     pub fn new() -> Self {
         Self {
             current_prefix: Prefix::None,
+            tables: InstructionTables::new(),
         }
     }
 
-    /// Detects and handles instruction prefixes
+    /// Handles prefix bytes and updates decoder state
     pub fn handle_prefix(&mut self, opcode: u8) -> bool {
         match (self.current_prefix, opcode) {
             (Prefix::None, 0xCB) => {
@@ -64,57 +68,46 @@ impl Decoder {
         }
     }
 
-    /// Decodes a single instruction
+    /// Decodes an opcode based on the current prefix state
     pub fn decode(&mut self, opcode: u8) -> Result<Instruction> {
+        // First check if this is a prefix byte
         if self.handle_prefix(opcode) {
-            // Return early if this byte was a prefix
-            return Err(crate::EmulatorError::SystemError(
-                "Incomplete instruction (prefix only)".to_string(),
-            ));
+            return Ok(PREFIX_INSTRUCTION.clone());
         }
 
-        let instruction = self.lookup_instruction(self.current_prefix, opcode)?;
-        self.current_prefix = Prefix::None;
-        Ok(instruction)
-    }
-
-    /// Looks up the instruction implementation based on prefix and opcode
-    fn lookup_instruction(&self, prefix: Prefix, opcode: u8) -> Result<Instruction> {
-        // For now, just handle NOP (0x00) with no prefix
-        match (prefix, opcode) {
-            (Prefix::None, 0x00) => Ok(Instruction::new(
-                1,                        // length
-                super::instruction::nop,  // execute fn
-                "NOP",                    // mnemonic
-                InstructionType::Special, // instruction type
-                4,                        // t_states
-            )),
+        // Look up the instruction based on current prefix
+        match self.current_prefix {
+            Prefix::None => self
+                .tables
+                .lookup_main(opcode)
+                .cloned()
+                .ok_or(crate::EmulatorError::InvalidOpcode(opcode)),
+            Prefix::Cb => self
+                .tables
+                .lookup_cb(opcode)
+                .cloned()
+                .ok_or(crate::EmulatorError::InvalidOpcode(opcode)),
+            Prefix::Dd | Prefix::Fd => self
+                .tables
+                .lookup_ddfd(opcode)
+                .cloned()
+                .ok_or(crate::EmulatorError::InvalidOpcode(opcode)),
+            Prefix::Ed => self
+                .tables
+                .lookup_ed(opcode)
+                .cloned()
+                .ok_or(crate::EmulatorError::InvalidOpcode(opcode)),
             _ => Err(crate::EmulatorError::InvalidOpcode(opcode)),
         }
     }
 }
 
+static PREFIX_INSTRUCTION: LazyLock<Instruction> =
+    LazyLock::new(|| Instruction::new("PREFIX", 1, 4, InstructionType::Special, create_nop()));
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_prefix_detection() {
-        let mut decoder = Decoder::new();
-
-        // Test CB prefix
-        assert!(decoder.handle_prefix(0xCB));
-        assert_eq!(decoder.current_prefix, Prefix::Cb);
-
-        // Reset and test DD prefix
-        decoder.current_prefix = Prefix::None;
-        assert!(decoder.handle_prefix(0xDD));
-        assert_eq!(decoder.current_prefix, Prefix::Dd);
-
-        // Test DDCB prefix sequence
-        assert!(decoder.handle_prefix(0xCB));
-        assert_eq!(decoder.current_prefix, Prefix::DdCb);
-    }
 
     #[test]
     fn test_nop_decoding() {
@@ -123,7 +116,7 @@ mod tests {
 
         assert_eq!(instruction.length, 1);
         assert_eq!(instruction.mnemonic, "NOP");
-        assert_eq!(instruction.instruction_type, InstructionType::Special);
+        assert_eq!(instruction.instruction_type, InstructionType::Control);
         assert_eq!(instruction.t_states, 4);
     }
 
@@ -135,5 +128,20 @@ mod tests {
             result,
             Err(crate::EmulatorError::InvalidOpcode(0xFF))
         ));
+    }
+
+    #[test]
+    fn test_prefix_handling() {
+        let mut decoder = Decoder::new();
+
+        assert!(decoder.handle_prefix(0xCB));
+        assert_eq!(decoder.current_prefix, Prefix::Cb);
+
+        decoder.current_prefix = Prefix::None;
+        assert!(decoder.handle_prefix(0xDD));
+        assert_eq!(decoder.current_prefix, Prefix::Dd);
+
+        assert!(decoder.handle_prefix(0xCB));
+        assert_eq!(decoder.current_prefix, Prefix::DdCb);
     }
 }
