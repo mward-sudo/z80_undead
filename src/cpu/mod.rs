@@ -2,6 +2,7 @@
 
 mod instruction;
 
+use crate::event::{Event, EventQueue};
 use crate::{memory::Memory, Result};
 use instruction::create_nop;
 
@@ -38,6 +39,9 @@ pub struct Cpu {
     flags_prime: Flags,
     // Memory reference
     memory: Memory,
+    // Add T-state counter
+    t_states: u32,
+    event_queue: EventQueue,
 }
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -118,13 +122,27 @@ impl Cpu {
             flags: Flags::default(),
             flags_prime: Flags::default(),
             memory,
+            t_states: 0,
+            event_queue: EventQueue::new(),
         }
     }
 
-    /// Executes a single instruction
-    pub fn step(&mut self) -> Result<()> {
-        // Fetch
+    /// Executes a single instruction and processes events
+    pub fn step(&mut self) -> Result<u32> {
+        // Initial T-state for this step
+        let start_t_states = self.t_states;
+
+        // Process any pending events before fetch
+        self.process_events()?;
+
+        // Fetch (opcode fetch is included in instruction.t_states)
         let opcode = self.memory.read_byte(self.pc)?;
+
+        // Process events after fetch
+        self.process_events()?;
+
+        // Increment R register
+        self.increment_r();
 
         // Decode
         let instruction = match opcode {
@@ -132,12 +150,44 @@ impl Cpu {
             _ => return Err(crate::EmulatorError::InvalidOpcode(opcode)),
         };
 
-        // Execute
+        // Execute and process events during instruction
         (instruction.execute)(self)?;
+        self.process_events()?;
+
+        // Add instruction T-states (includes fetch)
+        self.t_states += instruction.t_states;
+
+        // Process final events for this instruction
+        self.process_events()?;
 
         // Increment PC
         self.pc = self.pc.wrapping_add(instruction.length as u16);
 
+        Ok(self.t_states - start_t_states) // Return actual T-states consumed
+    }
+
+    /// Process any events scheduled for the current T-state
+    fn process_events(&mut self) -> Result<()> {
+        while let Some((event, t_state)) = self.event_queue.peek() {
+            if *t_state > self.t_states {
+                break;
+            }
+
+            let (event, _) = self.event_queue.pop().unwrap();
+            self.handle_event(event)?;
+        }
+        Ok(())
+    }
+
+    /// Handle a single event
+    fn handle_event(&mut self, event: Event) -> Result<()> {
+        match event {
+            // Handle different event types
+            // This will be expanded as we add more event types
+            Event::Interrupt => self.handle_interrupt()?,
+            Event::Timer => self.handle_timer()?,
+            // ... other event types
+        }
         Ok(())
     }
 
@@ -194,6 +244,26 @@ impl Cpu {
     /// Increment R register (called during instruction fetch)
     pub fn increment_r(&mut self) {
         self.r = (self.r & 0x80) | ((self.r + 1) & 0x7f);
+    }
+
+    /// Returns the current T-state count
+    pub fn get_t_states(&self) -> u32 {
+        self.t_states
+    }
+
+    /// Resets the T-state counter
+    pub fn reset_t_states(&mut self) {
+        self.t_states = 0;
+    }
+
+    fn handle_interrupt(&mut self) -> Result<()> {
+        // TODO: Implement interrupt handling
+        Ok(())
+    }
+
+    fn handle_timer(&mut self) -> Result<()> {
+        // TODO: Implement timer event handling
+        Ok(())
     }
 }
 
@@ -290,11 +360,12 @@ mod tests {
 
     #[test]
     fn test_register_pairs() {
-        let mut cpu = Cpu::default();
+        let mut cpu = Cpu {
+            b: 0x12,
+            c: 0x34,
+            ..Default::default()
+        };
 
-        // Test BC pair
-        cpu.b = 0x12;
-        cpu.c = 0x34;
         assert_eq!(cpu.get_bc(), 0x1234);
 
         cpu.set_bc(0x5678);
@@ -316,13 +387,19 @@ mod tests {
 
     #[test]
     fn test_exchange_register_sets() {
-        let mut cpu = Cpu::default();
-
-        // Set up some test values
-        cpu.a = 0x12;
-        cpu.a_prime = 0x34;
-        cpu.flags.zero = true;
-        cpu.flags_prime.zero = false;
+        let mut cpu = Cpu {
+            a: 0x12,
+            a_prime: 0x34,
+            flags: Flags {
+                zero: true,
+                ..Default::default()
+            },
+            flags_prime: Flags {
+                zero: false,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
 
         cpu.exchange_register_sets();
 
@@ -334,9 +411,11 @@ mod tests {
 
     #[test]
     fn test_r_register_increment() {
-        let mut cpu = Cpu::default();
+        let mut cpu = Cpu {
+            r: 0x00,
+            ..Default::default()
+        };
 
-        cpu.r = 0x00;
         cpu.increment_r();
         assert_eq!(cpu.r, 0x01);
 
@@ -349,5 +428,72 @@ mod tests {
         cpu.r = 0x80;
         cpu.increment_r();
         assert_eq!(cpu.r, 0x81);
+    }
+
+    #[test]
+    fn test_instruction_timing() {
+        let mut cpu = Cpu::default();
+        let program = [0x00]; // NOP instruction
+        cpu.load_program(0, &program).unwrap();
+
+        // NOP should take 4 T-states
+        let t_states = cpu.step().unwrap();
+        assert_eq!(t_states, 4);
+        assert_eq!(cpu.get_t_states(), 4);
+    }
+
+    #[test]
+    fn test_event_processing() {
+        let mut cpu = Cpu::default();
+
+        // Schedule an event
+        cpu.event_queue.push(Event::Timer, 4);
+
+        // Execute NOP (4 T-states)
+        let program = [0x00];
+        cpu.load_program(0, &program).unwrap();
+
+        let t_states = cpu.step().unwrap();
+
+        // Verify timing and event processing
+        assert_eq!(t_states, 4);
+        assert!(cpu.event_queue.is_empty());
+    }
+
+    #[test]
+    fn test_event_timing_sequence() {
+        let mut cpu = Cpu::default();
+
+        // Schedule multiple events
+        cpu.event_queue.push(Event::Timer, 2);
+        cpu.event_queue.push(Event::Interrupt, 4);
+
+        let program = [0x00]; // NOP
+        cpu.load_program(0, &program).unwrap();
+
+        let t_states = cpu.step().unwrap();
+
+        // Verify:
+        // 1. Both events were processed
+        // 2. Correct number of T-states elapsed
+        // 3. Events were processed in order
+        assert_eq!(t_states, 4);
+        assert!(cpu.event_queue.is_empty());
+    }
+
+    #[test]
+    fn test_event_processing_order() {
+        let mut cpu = Cpu::default();
+
+        // Schedule events out of order
+        cpu.event_queue.push(Event::Interrupt, 4);
+        cpu.event_queue.push(Event::Timer, 2);
+
+        // Verify events are sorted by T-state
+        let first_event = cpu.event_queue.peek().unwrap();
+        match first_event.0 {
+            Event::Timer => (),
+            _ => panic!("Events not properly ordered by T-state"),
+        }
     }
 }

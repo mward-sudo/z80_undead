@@ -18,7 +18,9 @@ impl System {
 
     /// Executes one system tick
     pub fn tick(&mut self) -> Result<()> {
-        self.cpu.step()
+        // Execute one CPU step and ignore the returned T-states
+        let _t_states = self.cpu.step()?;
+        Ok(())
     }
 
     /// Loads a program into memory
