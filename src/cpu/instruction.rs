@@ -57,13 +57,18 @@ impl Instruction {
     }
 }
 
-/// Creates the NOP instruction metadata
+/// NOP instruction implementation
+pub fn nop(_cpu: &mut Cpu) -> Result<()> {
+    Ok(())
+}
+
+/// Creates a NOP instruction
 pub fn create_nop() -> Instruction {
     Instruction::new(
         1,                        // length
-        |_cpu| Ok(()),            // execute fn
+        nop,                      // execute fn
         "NOP",                    // mnemonic
-        InstructionType::Control, // instruction type
+        InstructionType::Special, // instruction type
         4,                        // t_states
     )
 }

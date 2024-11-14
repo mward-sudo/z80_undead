@@ -1,10 +1,12 @@
 //! CPU module handles Z80 CPU emulation including registers, flags, and instruction execution.
 
+mod decoder;
 mod instruction;
 
 use crate::event::{Event, EventQueue};
 use crate::{memory::Memory, Result};
-use instruction::create_nop;
+use decoder::Decoder;
+use instruction::{create_nop, Instruction};
 
 /// Represents the Z80 CPU state
 pub struct Cpu {
@@ -42,6 +44,7 @@ pub struct Cpu {
     // Add T-state counter
     t_states: u32,
     event_queue: EventQueue,
+    decoder: Decoder,
 }
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -124,6 +127,7 @@ impl Cpu {
             memory,
             t_states: 0,
             event_queue: EventQueue::new(),
+            decoder: Decoder::new(),
         }
     }
 
@@ -135,20 +139,14 @@ impl Cpu {
         // Process any pending events before fetch
         self.process_events()?;
 
-        // Fetch (opcode fetch is included in instruction.t_states)
-        let opcode = self.memory.read_byte(self.pc)?;
+        // Fetch and decode
+        let instruction = self.fetch_decode()?;
 
         // Process events after fetch
         self.process_events()?;
 
         // Increment R register
         self.increment_r();
-
-        // Decode
-        let instruction = match opcode {
-            0x00 => create_nop(),
-            _ => return Err(crate::EmulatorError::InvalidOpcode(opcode)),
-        };
 
         // Execute and process events during instruction
         (instruction.execute)(self)?;
@@ -264,6 +262,12 @@ impl Cpu {
     fn handle_timer(&mut self) -> Result<()> {
         // TODO: Implement timer event handling
         Ok(())
+    }
+
+    /// Fetches and decodes the next instruction
+    fn fetch_decode(&mut self) -> Result<Instruction> {
+        let opcode = self.memory.read_byte(self.pc)?;
+        self.decoder.decode(opcode)
     }
 }
 
