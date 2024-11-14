@@ -11,8 +11,31 @@ pub struct Cpu {
     pc: u16,
     // Stack Pointer
     sp: u16,
+    // Main register set
+    a: u8, // Accumulator
+    b: u8, // B register
+    c: u8, // C register
+    d: u8, // D register
+    e: u8, // E register
+    h: u8, // H register
+    l: u8, // L register
+    // Alternate register set
+    a_prime: u8,
+    b_prime: u8,
+    c_prime: u8,
+    d_prime: u8,
+    e_prime: u8,
+    h_prime: u8,
+    l_prime: u8,
+    // Index registers
+    ix: u16, // IX index register
+    iy: u16, // IY index register
+    // Special purpose registers
+    i: u8, // Interrupt vector
+    r: u8, // Memory refresh
     // Flags register
     flags: Flags,
+    flags_prime: Flags,
     // Memory reference
     memory: Memory,
 }
@@ -73,8 +96,27 @@ impl Cpu {
     pub fn new(memory: Memory) -> Self {
         Self {
             pc: 0,
-            sp: 0xFFFF, // Stack starts at top of memory
+            sp: 0xFFFF,
+            a: 0,
+            b: 0,
+            c: 0,
+            d: 0,
+            e: 0,
+            h: 0,
+            l: 0,
+            a_prime: 0,
+            b_prime: 0,
+            c_prime: 0,
+            d_prime: 0,
+            e_prime: 0,
+            h_prime: 0,
+            l_prime: 0,
+            ix: 0,
+            iy: 0,
+            i: 0,
+            r: 0,
             flags: Flags::default(),
+            flags_prime: Flags::default(),
             memory,
         }
     }
@@ -107,6 +149,51 @@ impl Cpu {
     /// Loads a program into memory at the specified address
     pub fn load_program(&mut self, address: u16, program: &[u8]) -> Result<()> {
         self.memory.load(address, program)
+    }
+
+    // Helper methods for 16-bit register pairs
+    pub fn get_bc(&self) -> u16 {
+        ((self.b as u16) << 8) | (self.c as u16)
+    }
+
+    pub fn set_bc(&mut self, value: u16) {
+        self.b = (value >> 8) as u8;
+        self.c = value as u8;
+    }
+
+    pub fn get_de(&self) -> u16 {
+        ((self.d as u16) << 8) | (self.e as u16)
+    }
+
+    pub fn set_de(&mut self, value: u16) {
+        self.d = (value >> 8) as u8;
+        self.e = value as u8;
+    }
+
+    pub fn get_hl(&self) -> u16 {
+        ((self.h as u16) << 8) | (self.l as u16)
+    }
+
+    pub fn set_hl(&mut self, value: u16) {
+        self.h = (value >> 8) as u8;
+        self.l = value as u8;
+    }
+
+    /// Exchange main register set with alternate register set
+    pub fn exchange_register_sets(&mut self) {
+        std::mem::swap(&mut self.a, &mut self.a_prime);
+        std::mem::swap(&mut self.b, &mut self.b_prime);
+        std::mem::swap(&mut self.c, &mut self.c_prime);
+        std::mem::swap(&mut self.d, &mut self.d_prime);
+        std::mem::swap(&mut self.e, &mut self.e_prime);
+        std::mem::swap(&mut self.h, &mut self.h_prime);
+        std::mem::swap(&mut self.l, &mut self.l_prime);
+        std::mem::swap(&mut self.flags, &mut self.flags_prime);
+    }
+
+    /// Increment R register (called during instruction fetch)
+    pub fn increment_r(&mut self) {
+        self.r = (self.r & 0x80) | ((self.r + 1) & 0x7f);
     }
 }
 
@@ -199,5 +286,68 @@ mod tests {
         assert!(!cpu.flags.zero);
         assert!(cpu.flags.carry);
         assert!(!cpu.flags.parity);
+    }
+
+    #[test]
+    fn test_register_pairs() {
+        let mut cpu = Cpu::default();
+
+        // Test BC pair
+        cpu.b = 0x12;
+        cpu.c = 0x34;
+        assert_eq!(cpu.get_bc(), 0x1234);
+
+        cpu.set_bc(0x5678);
+        assert_eq!(cpu.b, 0x56);
+        assert_eq!(cpu.c, 0x78);
+
+        // Test DE pair
+        cpu.set_de(0x9ABC);
+        assert_eq!(cpu.get_de(), 0x9ABC);
+        assert_eq!(cpu.d, 0x9A);
+        assert_eq!(cpu.e, 0xBC);
+
+        // Test HL pair
+        cpu.set_hl(0xDEF0);
+        assert_eq!(cpu.get_hl(), 0xDEF0);
+        assert_eq!(cpu.h, 0xDE);
+        assert_eq!(cpu.l, 0xF0);
+    }
+
+    #[test]
+    fn test_exchange_register_sets() {
+        let mut cpu = Cpu::default();
+
+        // Set up some test values
+        cpu.a = 0x12;
+        cpu.a_prime = 0x34;
+        cpu.flags.zero = true;
+        cpu.flags_prime.zero = false;
+
+        cpu.exchange_register_sets();
+
+        assert_eq!(cpu.a, 0x34);
+        assert_eq!(cpu.a_prime, 0x12);
+        assert!(!cpu.flags.zero);
+        assert!(cpu.flags_prime.zero);
+    }
+
+    #[test]
+    fn test_r_register_increment() {
+        let mut cpu = Cpu::default();
+
+        cpu.r = 0x00;
+        cpu.increment_r();
+        assert_eq!(cpu.r, 0x01);
+
+        // Test wrap around of lower 7 bits
+        cpu.r = 0x7F;
+        cpu.increment_r();
+        assert_eq!(cpu.r, 0x00);
+
+        // Test preservation of bit 7
+        cpu.r = 0x80;
+        cpu.increment_r();
+        assert_eq!(cpu.r, 0x81);
     }
 }
