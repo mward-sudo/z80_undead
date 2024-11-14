@@ -1,4 +1,5 @@
 pub mod cpu;
+pub mod event;
 pub mod memory;
 pub mod system;
 
@@ -12,6 +13,8 @@ pub enum EmulatorError {
     InvalidOpcode(u8),
     #[error("System error: {0}")]
     SystemError(String),
+    #[error("Event processing error: {0}")]
+    EventError(String),
 }
 
 pub type Result<T> = std::result::Result<T, EmulatorError>;
