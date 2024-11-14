@@ -2,6 +2,7 @@
 
 mod decoder;
 mod instruction;
+mod tables;
 
 use crate::event::{Event, EventQueue};
 use crate::{memory::Memory, Result};

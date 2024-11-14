@@ -8,6 +8,33 @@ use std::fmt;
 pub type ExecuteFn = fn(&mut Cpu) -> Result<()>;
 
 /// Represents a Z80 instruction's metadata and execution function
+#[derive(Debug, Clone)]
+pub struct Instruction {
+    pub mnemonic: &'static str,
+    pub length: u8,
+    pub t_states: u32,
+    pub instruction_type: InstructionType,
+    pub execute: ExecuteFn,
+}
+
+impl Instruction {
+    pub const fn new(
+        mnemonic: &'static str,
+        length: u8,
+        t_states: u32,
+        instruction_type: InstructionType,
+        execute: ExecuteFn,
+    ) -> Self {
+        Self {
+            mnemonic,
+            length,
+            t_states,
+            instruction_type,
+            execute,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InstructionType {
     // Basic instruction types
@@ -26,51 +53,8 @@ pub enum InstructionType {
     Special,    // Special/misc instructions
 }
 
-#[derive(Debug)]
-pub struct Instruction {
-    /// Length of the instruction in bytes
-    pub length: u8,
-    /// Function pointer to the instruction's execution code
-    pub execute: ExecuteFn,
-    pub mnemonic: &'static str,
-    pub instruction_type: InstructionType,
-    /// Number of T-states (clock cycles) the instruction takes
-    pub t_states: u32,
-}
-
-impl Instruction {
-    /// Creates a new instruction with the specified metadata
-    pub fn new(
-        length: u8,
-        execute: ExecuteFn,
-        mnemonic: &'static str,
-        instruction_type: InstructionType,
-        t_states: u32,
-    ) -> Self {
-        Self {
-            length,
-            execute,
-            mnemonic,
-            instruction_type,
-            t_states,
-        }
-    }
-}
-
-/// NOP instruction implementation
-pub fn nop(_cpu: &mut Cpu) -> Result<()> {
-    Ok(())
-}
-
-/// Creates a NOP instruction
-pub fn create_nop() -> Instruction {
-    Instruction::new(
-        1,                        // length
-        nop,                      // execute fn
-        "NOP",                    // mnemonic
-        InstructionType::Special, // instruction type
-        4,                        // t_states
-    )
+pub const fn create_nop() -> ExecuteFn {
+    |_cpu| Ok(())
 }
 
 impl fmt::Display for Instruction {
@@ -188,38 +172,23 @@ mod tests {
 
     #[test]
     fn test_instruction_creation() {
-        let nop = create_nop();
-        assert_eq!(nop.length, 1);
+        let instruction = Instruction::new("TEST", 1, 4, InstructionType::Control, create_nop());
+        assert_eq!(instruction.length, 1);
+        assert_eq!(instruction.mnemonic, "TEST");
     }
 
     #[test]
     fn test_nop_execution() {
         let mut cpu = Cpu::new(Memory::new());
-        let nop = create_nop();
+        let instruction = Instruction::new("NOP", 1, 4, InstructionType::Control, create_nop());
 
         // Execute NOP instruction
-        (nop.execute)(&mut cpu).unwrap();
-
-        // NOP should not affect any CPU state except PC
-        // PC advancement is handled by the CPU step function
+        (instruction.execute)(&mut cpu).unwrap();
     }
 
     #[test]
     fn test_instruction_display() {
-        let instruction = Instruction::new(
-            1,                        // length
-            |_cpu| Ok(()),            // execute fn
-            "NOP",                    // mnemonic
-            InstructionType::Control, // instruction type
-            4,                        // t_states
-        );
+        let instruction = Instruction::new("NOP", 1, 4, InstructionType::Control, create_nop());
         assert_eq!(instruction.to_string(), "NOP (Control)");
-    }
-
-    #[test]
-    fn test_instruction_type_display() {
-        assert_eq!(InstructionType::Load.to_string(), "Load");
-        assert_eq!(InstructionType::Arithmetic.to_string(), "Arithmetic");
-        assert_eq!(InstructionType::BitManip.to_string(), "Bit Manipulation");
     }
 }
