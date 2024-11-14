@@ -15,6 +15,7 @@ pub struct Instruction {
     pub t_states: u32,
     pub instruction_type: InstructionType,
     pub execute: ExecuteFn,
+    pub affects_flags: bool,
 }
 
 impl Instruction {
@@ -31,7 +32,20 @@ impl Instruction {
             t_states,
             instruction_type,
             execute,
+            affects_flags: matches!(
+                instruction_type,
+                InstructionType::Arithmetic
+                    | InstructionType::Logic
+                    | InstructionType::Rotate
+                    | InstructionType::BitManip
+            ),
         }
+    }
+
+    // Add method to create instruction with flag effects
+    pub const fn with_flags(mut self) -> Self {
+        self.affects_flags = true;
+        self
     }
 }
 

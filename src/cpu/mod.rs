@@ -142,29 +142,24 @@ impl Cpu {
         // Process any pending events before fetch
         self.process_events()?;
 
-        // Fetch and decode
-        let instruction = self.fetch_decode()?;
+        // Fetch and decode instruction
+        let opcode = self.memory.read_byte(self.pc)?;
+        let instruction = self.decoder.decode(opcode)?;
 
-        // Process events after fetch
+        // Process events after fetch/decode
         self.process_events()?;
 
-        // Increment R register
-        self.increment_r();
-
-        // Execute and process events during instruction
+        // Execute instruction
         (instruction.execute)(self)?;
-        self.process_events()?;
 
-        // Add instruction T-states (includes fetch)
-        self.t_states += instruction.t_states;
-
-        // Process final events for this instruction
-        self.process_events()?;
-
-        // Increment PC
+        // Update PC after execution
         self.pc = self.pc.wrapping_add(instruction.length as u16);
 
-        // Calculate T-states for this step and update frame timing
+        // Add instruction T-states and process final events
+        self.t_states += instruction.t_states;
+        self.process_events()?;
+
+        // Calculate frame timing
         let step_t_states = self.t_states - start_t_states;
         Ok(self.timing.update_frame_t_states(step_t_states))
     }
@@ -267,12 +262,6 @@ impl Cpu {
     fn handle_timer(&mut self) -> Result<()> {
         // TODO: Implement timer event handling
         Ok(())
-    }
-
-    /// Fetches and decodes the next instruction
-    fn fetch_decode(&mut self) -> Result<Instruction> {
-        let opcode = self.memory.read_byte(self.pc)?;
-        self.decoder.decode(opcode)
     }
 
     /// Sets the CPU clock frequency

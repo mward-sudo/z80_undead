@@ -180,18 +180,11 @@ impl InstructionTables {
         // Start with NOP (0x00)
         self.main.insert(
             0x00,
-            Instruction {
-                mnemonic: "NOP",
-                length: 1,
-                t_states: 4,
-                instruction_type: InstructionType::Control,
-                execute: super::instruction::create_nop(),
-            },
+            Instruction::new("NOP", 1, 4, InstructionType::Control, create_nop()),
         );
     }
 
     fn init_cb_table(&mut self) {
-        // Bit operations (CB prefix)
         // RLC instructions (CB 00-07)
         for i in 0..8 {
             self.cb.insert(
