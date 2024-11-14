@@ -1,6 +1,9 @@
 //! CPU module handles Z80 CPU emulation including registers, flags, and instruction execution.
 
+mod instruction;
+
 use crate::{memory::Memory, Result};
+use instruction::create_nop;
 
 /// Represents the Z80 CPU state
 pub struct Cpu {
@@ -26,14 +29,20 @@ impl Cpu {
     pub fn step(&mut self) -> Result<()> {
         // Fetch
         let opcode = self.memory.read_byte(self.pc)?;
-        // Increment PC
-        self.pc = self.pc.wrapping_add(1);
 
-        // Decode and Execute (minimal implementation)
-        match opcode {
-            0x00 => Ok(()), // NOP
-            _ => Err(crate::EmulatorError::InvalidOpcode(opcode)),
-        }
+        // Decode
+        let instruction = match opcode {
+            0x00 => create_nop(),
+            _ => return Err(crate::EmulatorError::InvalidOpcode(opcode)),
+        };
+
+        // Execute
+        (instruction.execute)(self)?;
+
+        // Increment PC
+        self.pc = self.pc.wrapping_add(instruction.length as u16);
+
+        Ok(())
     }
 
     /// Returns the current program counter value
