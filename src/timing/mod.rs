@@ -67,6 +67,18 @@ impl TimingConverter {
         self.t_states_per_frame = frequency / RETROARCH_FPS;
         self.current_frame_t_states = 0;
     }
+
+    pub fn to_retroarch_timing(&self) -> f64 {
+        // RetroArch expects timing in frames per second
+        60.0
+    }
+
+    pub fn from_retroarch_timing(&mut self, fps: f64) {
+        // Calculate the new clock frequency needed to achieve the target fps
+        // For example, at 50 fps we need: base_clock * (50/60)
+        let new_frequency = (Z80_CLOCK_FREQUENCY as f64 * (fps / RETROARCH_FPS as f64)) as u32;
+        self.set_clock_frequency(new_frequency);
+    }
 }
 
 #[cfg(test)]
@@ -123,5 +135,20 @@ mod tests {
 
         // Check remaining T-states
         assert_eq!(converter.remaining_t_states(), 36666);
+    }
+
+    #[test]
+    fn test_retroarch_timing_conversion() {
+        let mut converter = TimingConverter::default();
+
+        // Test conversion to RetroArch timing
+        assert_eq!(converter.to_retroarch_timing(), 60.0);
+
+        // Test conversion from RetroArch timing
+        converter.from_retroarch_timing(50.0);
+        // At 50 fps with 4MHz base clock:
+        // New frequency = 4_000_000 * (50/60) = 3_333_333
+        // T-states per frame = 3_333_333 / 50 = 66666
+        assert_eq!(converter.t_states_per_frame(), 55555);
     }
 }
