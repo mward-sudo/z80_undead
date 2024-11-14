@@ -5,6 +5,7 @@ mod instruction;
 mod tables;
 
 use crate::event::{Event, EventQueue};
+use crate::timing::TimingConverter;
 use crate::{memory::Memory, Result};
 use decoder::Decoder;
 use instruction::{create_nop, Instruction};
@@ -46,6 +47,7 @@ pub struct Cpu {
     t_states: u32,
     event_queue: EventQueue,
     decoder: Decoder,
+    timing: TimingConverter,
 }
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -129,12 +131,12 @@ impl Cpu {
             t_states: 0,
             event_queue: EventQueue::new(),
             decoder: Decoder::new(),
+            timing: TimingConverter::default(),
         }
     }
 
-    /// Executes a single instruction and processes events
-    pub fn step(&mut self) -> Result<u32> {
-        // Initial T-state for this step
+    /// Returns true if a frame boundary was reached
+    pub fn step(&mut self) -> Result<bool> {
         let start_t_states = self.t_states;
 
         // Process any pending events before fetch
@@ -162,7 +164,9 @@ impl Cpu {
         // Increment PC
         self.pc = self.pc.wrapping_add(instruction.length as u16);
 
-        Ok(self.t_states - start_t_states) // Return actual T-states consumed
+        // Calculate T-states for this step and update frame timing
+        let step_t_states = self.t_states - start_t_states;
+        Ok(self.timing.update_frame_t_states(step_t_states))
     }
 
     /// Process any events scheduled for the current T-state
@@ -269,6 +273,16 @@ impl Cpu {
     fn fetch_decode(&mut self) -> Result<Instruction> {
         let opcode = self.memory.read_byte(self.pc)?;
         self.decoder.decode(opcode)
+    }
+
+    /// Sets the CPU clock frequency
+    pub fn set_clock_frequency(&mut self, frequency: u32) {
+        self.timing.set_clock_frequency(frequency);
+    }
+
+    /// Returns T-states remaining in current frame
+    pub fn remaining_frame_t_states(&self) -> u32 {
+        self.timing.remaining_t_states()
     }
 }
 
@@ -441,10 +455,14 @@ mod tests {
         let program = [0x00]; // NOP instruction
         cpu.load_program(0, &program).unwrap();
 
-        // NOP should take 4 T-states
-        let t_states = cpu.step().unwrap();
-        assert_eq!(t_states, 4);
+        // Execute NOP and check if frame boundary was reached
+        let frame_complete = cpu.step().unwrap();
+
+        // Verify T-states
         assert_eq!(cpu.get_t_states(), 4);
+
+        // At 4MHz, one NOP shouldn't complete a frame
+        assert!(!frame_complete);
     }
 
     #[test]
@@ -458,11 +476,12 @@ mod tests {
         let program = [0x00];
         cpu.load_program(0, &program).unwrap();
 
-        let t_states = cpu.step().unwrap();
+        let frame_complete = cpu.step().unwrap();
 
         // Verify timing and event processing
-        assert_eq!(t_states, 4);
+        assert_eq!(cpu.get_t_states(), 4);
         assert!(cpu.event_queue.is_empty());
+        assert!(!frame_complete);
     }
 
     #[test]
@@ -476,14 +495,15 @@ mod tests {
         let program = [0x00]; // NOP
         cpu.load_program(0, &program).unwrap();
 
-        let t_states = cpu.step().unwrap();
+        let frame_complete = cpu.step().unwrap();
 
         // Verify:
         // 1. Both events were processed
         // 2. Correct number of T-states elapsed
         // 3. Events were processed in order
-        assert_eq!(t_states, 4);
+        assert_eq!(cpu.get_t_states(), 4);
         assert!(cpu.event_queue.is_empty());
+        assert!(!frame_complete);
     }
 
     #[test]

@@ -2,6 +2,7 @@ pub mod cpu;
 pub mod event;
 pub mod memory;
 pub mod system;
+pub mod timing;
 
 use thiserror::Error;
 
