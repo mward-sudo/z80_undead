@@ -1,1 +1,9 @@
-/target
+# Generated files
+.last_generated_issues
+
+# Template directories
+scripts/templates/
+
+# Rust
+target/
+Cargo.lock
